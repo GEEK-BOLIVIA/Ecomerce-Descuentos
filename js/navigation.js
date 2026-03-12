@@ -5,6 +5,7 @@ import { usuarioModel } from './models/usuarioModel.js';
 import { usuarioController } from './controllers/usuarioController.js';
 import { departamentoController } from './controllers/departamentoController.js';
 import { direccionController } from './controllers/direccionController.js';
+import { descuentoController } from './controllers/descuentoController.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -116,6 +117,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.categoriasController = categoriasController;
     window.productoController = productoController;
     window.importacionController = importacionController;
+    window.descuentoController = descuentoController;
 
     const navItems = document.querySelectorAll('.nav-item');
     const contentArea = document.getElementById('content-area');

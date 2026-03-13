@@ -231,6 +231,164 @@ export const descuentoController = {
             Swal.close();
             descuentoView.notificarError('Error al eliminar el descuento.');
         }
+    },
+
+    // ─────────────────────────────────────────────
+    // VER DETALLE
+    // ─────────────────────────────────────────────
+    async ver(id) {
+        const contenedor = document.getElementById('content-area');
+        if (!contenedor) return;
+
+        descuentoView.mostrarCargando('Cargando detalle...');
+        try {
+            const [d, productos, categorias] = await Promise.all([
+                descuentoModel.getById(id),
+                descuentoModel.getProductosDelDescuento(id),
+                descuentoModel.getCategoriasDelDescuento(id),
+            ]);
+            Swal.close();
+            if (!d) return;
+
+            descuentoView.renderDetalle(contenedor, d, productos, categorias);
+
+            document.getElementById('dv-btn-volver')?.addEventListener('click', () => this.inicializar(true));
+            document.getElementById('dv-btn-editar')?.addEventListener('click', () => this._confirmarEditar(id));
+            document.getElementById('dv-btn-toggle')?.addEventListener('click', () => this._toggleActivoDesdeDetalle(id, !d.activo, productos, categorias));
+            document.getElementById('dv-btn-fecha')?.addEventListener('click', () => descuentoView.abrirModalFecha(id, d.fecha_inicio || '', d.fecha_fin || ''));
+
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            descuentoView.notificarError('Error al cargar el detalle del descuento.');
+        }
+    },
+
+    // ─────────────────────────────────────────────
+    // ACCIONES DESDE DETALLE
+    // ─────────────────────────────────────────────
+    async _confirmarEditar(id) {
+        const { isConfirmed } = await Swal.fire({
+            title: '<span class="text-slate-800 font-black uppercase text-sm">¿Editar descuento?</span>',
+            html: '<p class="text-slate-500 text-sm text-center">Se abrirá el formulario de edición.</p>',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, editar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#2563eb',
+            customClass: {
+                popup: 'rounded-[32px] border-none shadow-2xl',
+                confirmButton: 'rounded-xl px-8 py-3 font-bold text-sm uppercase',
+                cancelButton: 'rounded-xl px-8 py-3 font-bold text-sm bg-slate-100 text-slate-500'
+            }
+        });
+        if (isConfirmed) this.editar(id);
+    },
+
+    async _toggleActivoDesdeDetalle(id, nuevoEstado, productos, categorias) {
+        const accion = nuevoEstado ? 'activar' : 'desactivar';
+        const { isConfirmed } = await Swal.fire({
+            title: `<span class="text-slate-800 font-black uppercase text-sm">¿${nuevoEstado ? 'Activar' : 'Desactivar'} descuento?</span>`,
+            html: `<p class="text-slate-500 text-sm text-center">Se va a <span class="font-bold text-slate-700">${accion}</span> este descuento.</p>`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: `Sí, ${accion}`,
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: nuevoEstado ? '#059669' : '#64748b',
+            customClass: {
+                popup: 'rounded-[32px] border-none shadow-2xl',
+                confirmButton: 'rounded-xl px-8 py-3 font-bold text-sm uppercase',
+                cancelButton: 'rounded-xl px-8 py-3 font-bold text-sm bg-slate-100 text-slate-500'
+            }
+        });
+        if (!isConfirmed) return;
+        try {
+            descuentoView.mostrarCargando(nuevoEstado ? 'Activando...' : 'Desactivando...');
+            await descuentoModel.toggleActivo(id, nuevoEstado);
+            // Recargar cache y volver al detalle actualizado
+            this._datosCache = await descuentoModel.getAll();
+            Swal.close();
+            await this.ver(id);
+            descuentoView.notificarExito(`Descuento ${nuevoEstado ? 'activado' : 'desactivado'} correctamente.`);
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            descuentoView.notificarError('Error al cambiar el estado.');
+        }
+    },
+
+    async verEliminar(id, origen = 'tabla') {
+        const contenedor = document.getElementById('content-area');
+        if (!contenedor) return;
+
+        descuentoView.mostrarCargando('Cargando...');
+        try {
+            const [d, productos, categorias] = await Promise.all([
+                descuentoModel.getById(id),
+                descuentoModel.getProductosDelDescuento(id),
+                descuentoModel.getCategoriasDelDescuento(id),
+            ]);
+            Swal.close();
+            if (!d) return;
+
+            descuentoView.renderEliminar(contenedor, d, productos, categorias);
+
+            const volverFn = origen === 'detalle' ? () => this.ver(id) : () => this.inicializar(true);
+            document.getElementById('del-btn-volver')?.addEventListener('click', volverFn);
+            document.getElementById('del-btn-eliminar')?.addEventListener('click', () => this._ejecutarEliminacion(id, d.nombre));
+
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            descuentoView.notificarError('Error al cargar el descuento.');
+        }
+    },
+
+    async _ejecutarEliminacion(id, nombre) {
+        const { isConfirmed } = await Swal.fire({
+            title: '<span class="text-red-600 font-black uppercase text-sm">¿Confirmar eliminación?</span>',
+            html: `<p class="text-slate-500 text-sm text-center">
+                       Esta acción es <span class="text-red-600 font-bold">irreversible</span>.<br>
+                       El descuento <span class="font-bold text-slate-700">"${nombre}"</span> se eliminará permanentemente.
+                   </p>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, eliminar definitivamente',
+            cancelButtonText: 'No, cancelar',
+            confirmButtonColor: '#ef4444',
+            customClass: {
+                popup: 'rounded-[32px] border-none shadow-2xl',
+                confirmButton: 'rounded-xl px-8 py-3 font-bold text-sm uppercase',
+                cancelButton: 'rounded-xl px-8 py-3 font-bold text-sm bg-slate-100 text-slate-500'
+            }
+        });
+        if (!isConfirmed) return;
+        try {
+            descuentoView.mostrarCargando('Eliminando...');
+            await descuentoModel.delete(id);
+            await this.inicializar(true);
+            descuentoView.notificarExito(`Descuento "${nombre}" eliminado correctamente.`);
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            descuentoView.notificarError('Error al eliminar el descuento.');
+        }
+    },
+
+    // ─────────────────────────────────────────────
+    // ACTUALIZAR FECHAS RÁPIDO
+    // ─────────────────────────────────────────────
+    async actualizarFechas(id, fecha_inicio, fecha_fin) {
+        try {
+            descuentoView.mostrarCargando('Guardando fechas...');
+            await descuentoModel.updateFechas(id, fecha_inicio, fecha_fin);
+            await this.inicializar(true);
+            descuentoView.notificarExito('Fechas actualizadas correctamente.');
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            descuentoView.notificarError('Error al actualizar las fechas.');
+        }
     }
 };
 

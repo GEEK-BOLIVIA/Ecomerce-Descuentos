@@ -77,6 +77,20 @@ export const descuentoModel = {
         return data;
     },
 
+    async updateFechas(id, fecha_inicio, fecha_fin) {
+        const { data, error } = await supabase
+            .from('descuento')
+            .update({
+                fecha_inicio: fecha_inicio || null,
+                fecha_fin: fecha_fin || null
+            })
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
+    },
+
     async toggleActivo(id, activo) {
         const { data, error } = await supabase
             .from('descuento')
@@ -103,10 +117,29 @@ export const descuentoModel = {
         try {
             const { data, error } = await supabase
                 .from('descuento_producto')
-                .select('id_producto, producto:id_producto(id, nombre)')
+                .select(`
+                    producto:id_producto (
+                        id, nombre,
+                        galeria_producto ( url, orden ),
+                        sucursal_producto ( precio, id_sucursal ),
+                        producto_categorias_rel (
+                            categoria:id_categoria ( id, nombre )
+                        )
+                    )
+                `)
                 .eq('id_descuento', id);
             if (error) throw error;
-            return data.map(d => d.producto);
+            return (data ?? [])
+                .map(d => d.producto)
+                .filter(Boolean)
+                .map(p => ({
+                    id: p.id,
+                    nombre: p.nombre,
+                    imagen: p.galeria_producto?.sort((a, b) => a.orden - b.orden)?.[0]?.url ?? null,
+                    precios: p.sucursal_producto ?? [],
+                    categoria: p.producto_categorias_rel?.[0]?.categoria ?? null,
+                    excluidos: []
+                }));
         } catch (error) {
             console.error('Model Error [descuento.getProductos]:', error.message);
             return [];

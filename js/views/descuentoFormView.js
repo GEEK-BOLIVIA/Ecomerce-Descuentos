@@ -258,6 +258,12 @@ export const descuentoFormView = {
         this._actualizarBotones();
         this._actualizarPreview();
         this._bindEventosPaso();
+
+        // Al entrar al paso 3 con datos previos (edición), poblar el carrito y chips
+        if (this._paso === 3) {
+            if (this._categoriasSeleccionadas.length > 0) this._refrescarChipsCategorias();
+            if (this._productosSeleccionados.length > 0) this._refrescarCarrito();
+        }
     },
 
     // ─────────────────────────────────────────────
@@ -970,19 +976,20 @@ export const descuentoFormView = {
                        </div>`;
                 return `
                 <button class="btn-agregar-prod w-full flex items-center gap-2.5 px-2.5 py-2
-                               rounded-xl hover:bg-emerald-50 transition-all text-left
-                               border border-transparent hover:border-emerald-100
-                               ${ya ? 'opacity-40 pointer-events-none' : ''}"
+                               rounded-xl transition-all text-left border
+                               ${ya
+                        ? 'opacity-50 pointer-events-none bg-slate-50 border-slate-100 cursor-not-allowed'
+                        : 'hover:bg-emerald-50 border-transparent hover:border-emerald-100'}"
                         data-prod-id="${p.id}" data-prod-nombre="${p.nombre}"
                         data-prod-imagen="${p.imagen || ''}"
                         data-prod-precios='${JSON.stringify(p.precios || [])}'>
                     ${img}
                     <div class="flex-1 min-w-0">
                         <p class="text-[12px] font-bold text-slate-700 truncate">${p.nombre}</p>
-                        <p class="text-[10px] text-slate-400">${p.categoria?.nombre || '—'}</p>
+                        <p class="text-[10px] ${ya ? 'text-emerald-500 font-bold' : 'text-slate-400'}">${ya ? 'Ya agregado' : (p.categoria?.nombre || '—')}</p>
                     </div>
                     <span class="material-symbols-outlined text-[18px] flex-shrink-0
-                                 ${ya ? 'text-slate-300' : 'text-emerald-500'}">
+                                 ${ya ? 'text-emerald-400' : 'text-emerald-500'}">
                         ${ya ? 'check_circle' : 'add_circle'}
                     </span>
                 </button>`;
@@ -1000,9 +1007,11 @@ export const descuentoFormView = {
                         this._productosSeleccionados.push({ id, nombre, imagen, precios, excluidos: [] });
                         this._refrescarCarrito();
                         this._actualizarPreview();
-                        btn.classList.add('opacity-40', 'pointer-events-none');
-                        const ico = btn.querySelector('span.material-symbols-outlined:last-child');
-                        if (ico) { ico.textContent = 'check_circle'; ico.classList.replace('text-emerald-500', 'text-slate-300'); }
+
+                        // Limpiar input y cerrar resultados
+                        const input = document.getElementById('p3-buscador-producto');
+                        if (input) input.value = '';
+                        resultadosEl.innerHTML = `<p class="text-[11px] text-slate-400 italic text-center py-3">Escribe para buscar...</p>`;
                     }
                 });
             });
@@ -1494,6 +1503,20 @@ export const descuentoFormView = {
         }).then(({ isConfirmed }) => {
             if (!isConfirmed) return;
             if (this._onGuardar) {
+                // Convierte YYYY-MM-DD a ISO con timezone local
+                // fecha_inicio → inicio del día, fecha_fin → fin del día (23:59:59)
+                const fechaAISO = (val, esFin = false) => {
+                    if (!val) return null;
+                    const pad = n => String(n).padStart(2, '0');
+                    const d = esFin
+                        ? new Date(`${val}T23:59:59`)
+                        : new Date(`${val}T00:00:00`);
+                    const off = -d.getTimezoneOffset();
+                    const sign = off >= 0 ? '+' : '-';
+                    const hOff = pad(Math.floor(Math.abs(off) / 60));
+                    const mOff = pad(Math.abs(off) % 60);
+                    return `${val}T${esFin ? '23:59:59' : '00:00:00'}${sign}${hOff}:${mOff}`;
+                };
                 this._onGuardar({
                     descuento: {
                         nombre, descripcion, tipo,
@@ -1501,8 +1524,8 @@ export const descuentoFormView = {
                         alcance,
                         id_sucursal: id_sucursal || null,
                         activo,
-                        fecha_inicio: fecha_inicio || null,
-                        fecha_fin: fecha_fin || null
+                        fecha_inicio: fechaAISO(fecha_inicio, false),
+                        fecha_fin: fechaAISO(fecha_fin, true)
                     },
                     categorias: this._categoriasSeleccionadas.map(c => c.id),
                     productos: this._productosSeleccionados.map(p => p.id)

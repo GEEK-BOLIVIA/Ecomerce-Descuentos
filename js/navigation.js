@@ -6,6 +6,7 @@ import { usuarioController } from './controllers/usuarioController.js';
 import { departamentoController } from './controllers/departamentoController.js';
 import { direccionController } from './controllers/direccionController.js';
 import { descuentoController } from './controllers/descuentoController.js';
+import { comboController } from './controllers/comboController.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
 

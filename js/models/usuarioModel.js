@@ -7,24 +7,22 @@ export const usuarioModel = {
 
     async loginConRedSocial(proveedor) {
         try {
-            // 1. Limpieza preventiva (Mantenemos tu lógica de limpieza)
+            // Limpieza de rastros antiguos
             if (window.location.hash) {
                 window.history.replaceState(null, null, window.location.pathname);
             }
             localStorage.removeItem('supabase.auth.token');
             sessionStorage.clear();
 
-            // 2. CÁLCULO DINÁMICO DE URL (La corrección clave)
-            // Esto detecta si estás en .test, localhost o hostinger automáticamente
-            const urlActual = `${window.location.origin}${window.location.pathname}`;
+            // CONSTRUCCIÓN SEGURA: 
+            // En Hostinger, esto devolverá exactamente https://tu-sitio.com/ruta-actual
+            const urlActual = window.location.origin + window.location.pathname;
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: proveedor,
                 options: {
-                    redirectTo: urlActual, // Ya no es fija, es donde estés parado ahora
-                    queryParams: {
-                        prompt: 'select_account'
-                    }
+                    redirectTo: urlActual,
+                    queryParams: { prompt: 'select_account' }
                 }
             });
 

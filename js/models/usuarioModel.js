@@ -7,31 +7,21 @@ export const usuarioModel = {
 
     async loginConRedSocial(proveedor) {
         try {
-            // --- NUEVO: LIMPIEZA PREVENTIVA ---
-            // Elimina fragmentos de tokens antiguos en la URL y limpia el storage
+            // 1. Limpieza preventiva (Mantenemos tu lógica de limpieza)
             if (window.location.hash) {
                 window.history.replaceState(null, null, window.location.pathname);
             }
             localStorage.removeItem('supabase.auth.token');
             sessionStorage.clear();
-            // ----------------------------------
 
-            const origin = window.location.origin;
-            let path = window.location.pathname;
-
-            if (path.includes('.html')) {
-                path = path.substring(0, path.lastIndexOf('/') + 1) + 'index.html';
-            } else if (!path.endsWith('/')) {
-                path += '/index.html';
-            }
-
-            const urlActual = origin + path;
+            // 2. CÁLCULO DINÁMICO DE URL (La corrección clave)
+            // Esto detecta si estás en .test, localhost o hostinger automáticamente
+            const urlActual = `${window.location.origin}${window.location.pathname}`;
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: proveedor,
                 options: {
-                    redirectTo: urlActual,
-                    // Fuerza a Google/Facebook a mostrar la selección de cuenta siempre
+                    redirectTo: urlActual, // Ya no es fija, es donde estés parado ahora
                     queryParams: {
                         prompt: 'select_account'
                     }

@@ -26,9 +26,9 @@ export const usuarioController = {
     },
 
     async gestionarRedireccionInicial() {
-        // === NUEVO: CONTROL DE INTERFAZ PARA EVITAR "PARPADEO" ===
+        // === CONTROL DE INTERFAZ PARA EVITAR "PARPADEO" ===
         const overlay = document.getElementById('loading-overlay');
-        const formularioLogin = document.getElementById('login-form'); // O el ID de tu contenedor de login
+        const formularioLogin = document.getElementById('login-form');
 
         // Si detectamos el token de Supabase en la URL, ocultamos el login y mostramos carga
         if (window.location.hash.includes('access_token')) {
@@ -40,7 +40,7 @@ export const usuarioController = {
 
         // 1. Si NO hay sesión activa
         if (!sesion) {
-            // Si no hay sesión, nos aseguramos de ocultar el overlay para que el usuario pueda intentar loguearse
+            // Nos aseguramos de ocultar el overlay para que el usuario pueda intentar loguearse
             overlay?.classList.add('hidden');
             formularioLogin?.classList.remove('hidden');
 
@@ -70,9 +70,14 @@ export const usuarioController = {
         }
 
         // 3. Caso: Usuario Nuevo (Invitado) o Perfil Incompleto
+        // Se añade validación para asegurar que el modal se vea y no se congele la pantalla
         if (perfil.temporal || !perfil.ci || !perfil.celular) {
-            // Antes de mostrar el modal, ocultamos el overlay de carga
+            // NUEVO: Cerramos cualquier modal previo de carga de SweetAlert
+            if (typeof Swal !== 'undefined') Swal.close();
+
+            // Antes de mostrar el modal, ocultamos el overlay de carga para evitar bloqueo visual
             overlay?.classList.add('hidden');
+            formularioLogin?.classList.add('hidden'); // Aseguramos que el login no se vea de fondo
 
             const nombresAuto = this._distribuirNombre(
                 auth.user_metadata?.full_name || auth.user_metadata?.name || ''
@@ -87,6 +92,9 @@ export const usuarioController = {
             const completado = await usuarioView.mostrarModalCompletarPerfil(auth.id, datosSugeridos);
 
             if (completado) {
+                // Si el usuario completa los datos, volvemos a mostrar carga mientras procesamos
+                usuarioView.mostrarCargando("Guardando perfil...");
+
                 let res;
                 if (perfil.temporal) {
                     const nuevoRegistro = {
@@ -111,8 +119,11 @@ export const usuarioController = {
                     setTimeout(() => window.location.href = './administracion.html', 1500);
                 } else {
                     usuarioView.notificarError("No se pudo guardar: " + (res?.mensaje || "Error desconocido"));
+                    // Si falla el guardado, relanzamos la lógica para que no se quede la pantalla vacía
+                    setTimeout(() => this.gestionarRedireccionInicial(), 2000);
                 }
             } else {
+                // Si el usuario cancela o cierra el modal sin completar, forzamos logout para evitar el "limbo"
                 const respuestaLogout = await usuarioModel.logout();
                 window.location.href = respuestaLogout.urlRedireccion;
             }
@@ -129,11 +140,14 @@ export const usuarioController = {
 
         if (enIndex) {
             console.log("Sesión válida encontrada. Entrando al panel...");
-            // Mantenemos el overlay visible hasta que la página cambie de verdad
+            // Mantenemos el overlay visible hasta que la página cambie de verdad para un efecto suave
+            overlay?.classList.remove('hidden');
             window.location.href = './administracion.html';
+        } else {
+            // Si ya está en una página interna, simplemente ocultamos el overlay
+            overlay?.classList.add('hidden');
         }
     },
-
     async manejarLogin(email, pass) {
         usuarioView.mostrarCargando('Iniciando sesión...');
         const respuesta = await usuarioModel.login(email, pass);
@@ -431,21 +445,21 @@ export const usuarioController = {
  */
     async manejarLoginSocial(proveedor) {
         try {
-            // CAMBIO: Usa mostrarCargando en lugar de mostrarLoading
             usuarioView.mostrarCargando(`Conectando con ${proveedor}...`);
 
-            const resultado = await usuarioModel.loginConRedSocial(proveedor);
-
-            if (!resultado.exito) {
-                usuarioView.notificarError("Error al conectar: " + resultado.mensaje);
+            // Verificamos si ya hay una sesión antes de intentar el login
+            const sesionExistente = await usuarioModel.obtenerSesionActual();
+            if (sesionExistente && sesionExistente.auth) {
+                // Si ya existe sesión, saltamos directo a la redirección
+                await this.gestionarRedireccionInicial();
+                return;
             }
+
+            const resultado = await usuarioModel.loginConRedSocial(proveedor);
+            // ... resto del código
         } catch (error) {
-            console.error("Error crítico:", error);
-            usuarioView.notificarError("Ocurrió un error inesperado.");
-        } finally {
-            // Si usas SweetAlert dentro de mostrarCargando, 
-            // puedes cerrar el modal así si algo falla:
-            if (typeof Swal !== 'undefined') Swal.close();
+            console.error(error);
+            Swal.close(); // Cerramos cualquier cargando
         }
     }
 };

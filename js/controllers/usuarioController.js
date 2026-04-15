@@ -1,0 +1,444 @@
+import { usuarioModel } from '../models/usuarioModel.js';
+import { usuarioView } from '../views/usuarioView.js';
+import { detalleUsuarioModal } from '../views/components/detalleUsuarioModal.js';
+import { editarUsuarioModal } from '../views/components/editarUsuarioModal.js';
+import { eliminarUsuarioModal } from '../views/components/eliminarUsuarioModal.js';
+
+export const usuarioController = {
+
+    _estado: {
+        rolActual: '',
+        configActual: null
+    },
+
+    // Configuración estética por rol
+    _configuraciones: {
+        'owner': { rol: 'owner', titulo: 'Owners', color: 'blue' },
+        'admin': { rol: 'admin', titulo: 'Administradores', color: 'indigo' },
+        'cliente': { rol: 'cliente', titulo: 'Clientes', color: 'emerald' }
+    },
+    _distribuirNombre(fullName) {
+        const partes = fullName.trim().split(/\s+/);
+        if (partes.length >= 4) return { nombres: `${partes[0]} ${partes[1]}`, paterno: partes[2], materno: partes[3] };
+        if (partes.length === 3) return { nombres: partes[0], paterno: partes[1], materno: partes[2] };
+        if (partes.length === 2) return { nombres: partes[0], paterno: partes[1], materno: '' };
+        return { nombres: partes[0] || '', paterno: '', materno: '' };
+    },
+
+    async gestionarRedireccionInicial() {
+        const sesion = await usuarioModel.obtenerSesionActual();
+
+        // 1. Si NO hay sesión activa
+        if (!sesion) {
+            const pathActual = window.location.pathname;
+            const esPaginaPrivada = !pathActual.includes('index.html') && pathActual !== '/' && !pathActual.endsWith('/comercio/');
+
+            if (esPaginaPrivada) {
+                // Usamos ./ para que busque el index en la carpeta actual (/comercio/)
+                window.location.href = './index.html';
+            }
+            return;
+        }
+
+        const { auth, perfil, tipo } = sesion;
+
+        // 2. Caso: Acceso denegado (No está en la whitelist o no tiene perfil)
+        if (tipo === 'denegado' || !perfil) {
+            const respuestaLogout = await usuarioModel.logout();
+            usuarioView.notificarError("Acceso denegado: Tu correo no ha sido autorizado.");
+
+            // Redirigimos usando la URL dinámica calculada por el modelo
+            setTimeout(() => {
+                window.location.href = respuestaLogout.urlRedireccion;
+            }, 3000);
+            return;
+        }
+
+        // 3. Caso: Usuario Nuevo (Invitado) o Perfil Incompleto
+        if (perfil.temporal || !perfil.ci || !perfil.celular) {
+            const nombresAuto = this._distribuirNombre(
+                auth.user_metadata?.full_name || auth.user_metadata?.name || ''
+            );
+
+            const datosSugeridos = {
+                nombres: perfil.nombres || nombresAuto.nombres || '',
+                apellido_paterno: perfil.apellido_paterno || nombresAuto.paterno || '',
+                apellido_materno: perfil.apellido_materno || nombresAuto.materno || '',
+            };
+
+            const completado = await usuarioView.mostrarModalCompletarPerfil(auth.id, datosSugeridos);
+
+            if (completado) {
+                let res;
+                if (perfil.temporal) {
+                    const nuevoRegistro = {
+                        id: auth.id,
+                        correo_electronico: auth.email,
+                        rol: perfil.rol,
+                        visible: true,
+                        ...completado
+                    };
+                    res = await usuarioModel.crear(nuevoRegistro);
+                    if (res.exito) await usuarioModel.eliminarInvitacionPorCorreo(auth.email);
+                } else {
+                    res = await usuarioModel.actualizar(auth.id, completado);
+                }
+
+                if (res && res.exito) {
+                    usuarioView.notificarExito("¡Bienvenido! Perfil configurado correctamente.");
+                    sessionStorage.setItem('usuario_rol', perfil.rol);
+                    sessionStorage.setItem('usuario_nombre', completado.nombres);
+                    sessionStorage.setItem('usuario_id', auth.id);
+
+                    // Redirección relativa segura
+                    setTimeout(() => window.location.href = './administracion.html', 1500);
+                } else {
+                    usuarioView.notificarError("No se pudo guardar: " + (res?.mensaje || "Error desconocido"));
+                }
+            } else {
+                // Si cierra el modal obligatorio, logout y fuera
+                const respuestaLogout = await usuarioModel.logout();
+                window.location.href = respuestaLogout.urlRedireccion;
+            }
+            return;
+        }
+
+        // 4. Caso: Usuario recurrente (Perfil completo)
+        sessionStorage.setItem('usuario_rol', perfil.rol);
+        sessionStorage.setItem('usuario_nombre', perfil.nombres);
+        sessionStorage.setItem('usuario_id', auth.id);
+
+        const path = window.location.pathname;
+        const enIndex = path.endsWith('/') || path.includes('index.html');
+
+        if (enIndex) {
+            console.log("Sesión válida encontrada. Entrando al panel...");
+            // Redirección relativa segura
+            window.location.href = './administracion.html';
+        }
+    },
+
+    async manejarLogin(email, pass) {
+        usuarioView.mostrarCargando('Iniciando sesión...');
+        const respuesta = await usuarioModel.login(email, pass);
+        if (respuesta.exito) {
+            await this.gestionarRedireccionInicial();
+        } else {
+            usuarioView.notificarError(respuesta.mensaje);
+        }
+    },
+    // Reemplaza tu sección de Autenticación por esta:
+    async manejarLoginSocial(proveedor) {
+        usuarioView.mostrarCargando(`Conectando con ${proveedor}...`);
+        const respuesta = await usuarioModel.loginConRedSocial(proveedor);
+        if (!respuesta.exito) usuarioView.notificarError(respuesta.mensaje);
+    },
+
+    // ==========================================
+    // SECCIÓN: MOTOR CRUD GLOBAL
+    // ==========================================
+
+    /**
+     * Inicializa la sección según el rol (Se llama desde navigation.js)
+     */
+    async inicializarSeccion(rol) {
+        try {
+            if (document.activeElement) document.activeElement.blur();
+
+            const config = this._configuraciones[rol.toLowerCase()];
+            if (!config) throw new Error(`Rol ${rol} no configurado`);
+
+            this._estado.rolActual = rol;
+            this._estado.configActual = config;
+
+            usuarioView.mostrarCargando(`Obteniendo listado de ${config.titulo}...`);
+
+            const datos = await usuarioModel.obtenerPorRol(rol);
+
+            // Renderizamos usando la vista global
+            usuarioView.render(datos, config);
+
+            Swal.close();
+        } catch (error) {
+            console.error(`Error al inicializar:`, error);
+            usuarioView.notificarError("No se pudieron cargar los datos.");
+        }
+    },
+
+    /**
+     * Refresca la vista actual (útil para búsqueda, paginación o tras cambios)
+     */
+    async refrescarVista() {
+        const datos = await usuarioModel.obtenerPorRol(this._estado.rolActual);
+        usuarioView.render(datos, this._estado.configActual);
+    },
+
+    /**
+     * Lógica para eliminar (Desactivación lógica)
+     */
+    async previsualizarEliminacion(id) {
+        try {
+            usuarioView.mostrarCargando('Cargando datos del usuario...');
+            const usuario = await usuarioModel.obtenerPorId(id);
+            Swal.close();
+            if (usuario) eliminarUsuarioModal.mostrar(usuario);
+        } catch (error) {
+            usuarioView.notificarError('Error al cargar el usuario.');
+        }
+    },
+
+    async confirmarEliminacion(id) {
+        eliminarUsuarioModal.cerrar();
+        usuarioView.mostrarCargando('Eliminando usuario...');
+        try {
+            const res = await usuarioModel.actualizar(id, { visible: false });
+            Swal.close();
+            if (res.exito) {
+                usuarioView.notificarExito('Usuario eliminado correctamente.');
+                await this.refrescarVista();
+            } else {
+                usuarioView.notificarError(res.mensaje);
+            }
+        } catch (error) {
+            Swal.close();
+            usuarioView.notificarError('Error inesperado al eliminar.');
+        }
+    },
+
+    /**
+     * Abre el modal para ver detalles (Llamado desde la vista)
+     */
+    async verDetalle(id) {
+        try {
+            const usuario = await usuarioModel.obtenerPorId(id);
+            if (usuario) {
+                usuarioView.mostrarDetalle(usuario);
+            }
+        } catch (error) {
+            usuarioView.notificarError("Error al cargar detalles.");
+        }
+    },
+
+    /**
+     * Prepara y muestra el formulario de creación o edición
+     */
+    async mostrarFormulario() {
+        const resultadoForm = await usuarioView.mostrarFormularioUsuario({
+            titulo: `Nuevo ${this._estado.configActual.rol}`,
+            datos: { nombres: '', correo_electronico: '', ci: '', celular: '' },
+            color: this._estado.configActual.color,
+            esEdicion: false
+        });
+
+        if (resultadoForm) {
+            this.guardarUsuario(null, resultadoForm);
+        }
+    },
+    async guardarUsuario(id, datos) {
+        const mensajeCarga = id ? 'Actualizando datos...' : 'Enviando invitación...';
+        usuarioView.mostrarCargando(mensajeCarga);
+
+        try {
+            let resultado;
+
+            if (id) {
+                // CASO A: Edición
+                resultado = await usuarioModel.actualizar(id, datos);
+            } else {
+                // CASO B: Invitación
+                const rolesRestringidos = ['owner', 'admin'];
+                const rolAInvitar = this._estado.rolActual.toLowerCase();
+
+                if (!rolesRestringidos.includes(rolAInvitar)) {
+                    usuarioView.notificarError(`El rol "${rolAInvitar}" no requiere invitación manual.`);
+                    return;
+                }
+
+                const emailLimpio = datos.correo_electronico.toLowerCase().trim();
+
+                // VALIDACIÓN: ¿Ya existe en la tabla de usuarios activos?
+                const usuariosExistentes = await usuarioModel.obtenerTodos();
+                const yaExiste = usuariosExistentes.some(u => u.correo_electronico === emailLimpio);
+
+                if (yaExiste) {
+                    usuarioView.notificarError("Este correo ya pertenece a un usuario activo.");
+                    return;
+                }
+
+                const datosInvitacion = {
+                    correo_electronico: emailLimpio,
+                    rol: this._estado.rolActual
+                };
+
+                resultado = await usuarioModel.autorizarEnWhitelist(datosInvitacion);
+            }
+
+            if (resultado.exito) {
+                usuarioView.notificarExito(id ? 'Perfil actualizado.' : `Invitación enviada a ${datos.correo_electronico}.`);
+                await this.refrescarVista();
+            } else {
+                usuarioView.notificarError(resultado.mensaje);
+            }
+
+        } catch (error) {
+            console.error("Error en guardarUsuario:", error);
+            usuarioView.notificarError("Ocurrió un error inesperado.");
+        }
+    },
+    async editar(id) {
+        try {
+            // SweetAlert de carga mientras busca el usuario
+            usuarioView.mostrarCargando('Cargando datos del usuario...');
+            const usuario = await usuarioModel.obtenerPorId(id);
+            Swal.close();
+
+            if (usuario) editarUsuarioModal.mostrar(usuario);
+        } catch (error) {
+            usuarioView.notificarError("Error al cargar el usuario.");
+        }
+    },
+
+    async guardarEdicion(id) {
+        const payload = editarUsuarioModal.obtenerPayload();
+        if (!payload) return;
+
+        // Confirmación antes de guardar
+        const { isConfirmed } = await Swal.fire({
+            title: '<span class="text-slate-800 font-black uppercase text-sm">¿Guardar cambios?</span>',
+            text: 'Se actualizarán los datos del perfil.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'SÍ, GUARDAR',
+            cancelButtonText: 'CANCELAR',
+            confirmButtonColor: '#000000',
+            customClass: {
+                popup: 'rounded-[32px] border-none shadow-2xl',
+                confirmButton: 'rounded-xl px-6 py-3 font-bold text-sm',
+                cancelButton: 'rounded-xl px-6 py-3 font-bold text-sm bg-slate-100 text-slate-500'
+            }
+        });
+
+        if (!isConfirmed) return;
+
+        editarUsuarioModal.setGuardando(true);
+        try {
+            usuarioView.mostrarCargando('Actualizando datos...');
+            const res = await usuarioModel.actualizar(id, payload);
+            Swal.close();
+
+            if (res.exito) {
+                editarUsuarioModal.cerrar();
+                usuarioView.notificarExito('Usuario actualizado correctamente.');
+                await this.refrescarVista();
+            } else {
+                editarUsuarioModal.setGuardando(false);
+                usuarioView.notificarError(res.mensaje);
+            }
+        } catch (error) {
+            Swal.close();
+            editarUsuarioModal.setGuardando(false);
+            usuarioView.notificarError("Error inesperado al guardar.");
+        }
+    },
+
+    cerrarModalEdicion() {
+        Swal.fire({
+            title: '<span class="text-slate-800 font-black uppercase text-sm">¿Descartar cambios?</span>',
+            text: 'Los cambios no guardados se perderán.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'SÍ, CERRAR',
+            cancelButtonText: 'SEGUIR EDITANDO',
+            confirmButtonColor: '#000000',
+            customClass: {
+                popup: 'rounded-[32px] border-none shadow-2xl',
+                confirmButton: 'rounded-xl px-6 py-3 font-bold text-sm',
+                cancelButton: 'rounded-xl px-6 py-3 font-bold text-sm bg-slate-100 text-slate-500'
+            }
+        }).then(({ isConfirmed }) => {
+            if (isConfirmed) editarUsuarioModal.cerrar();
+        });
+    },
+    async abrirFormularioInvitacion(rol) {
+        const config = this._configuraciones[rol.toLowerCase()];
+        if (!config) return;
+
+        // Establece el estado aunque no se haya navegado a la sección
+        this._estado.rolActual = rol;
+        this._estado.configActual = config;
+
+        await this.mostrarFormulario();
+    },
+    async verDetalle(id) {
+        try {
+            usuarioView.mostrarCargando('Cargando datos del usuario...');
+            const usuario = await usuarioModel.obtenerPorId(id);
+            Swal.close();
+            if (usuario) detalleUsuarioModal.mostrar(usuario);
+        } catch (error) {
+            usuarioView.notificarError('Error al cargar el usuario.');
+        }
+    },
+
+    async editarDesdeDetalle(id) {
+        detalleUsuarioModal.cerrar();
+        usuarioView.mostrarCargando('Preparando formulario...');
+
+        try {
+            const usuario = await usuarioModel.obtenerPorId(id);
+            Swal.close();
+
+            const { isConfirmed } = await Swal.fire({
+                title: '<span class="text-slate-800 font-black uppercase text-sm">Editar perfil</span>',
+                text: `Vas a modificar los datos de ${usuario.nombres} ${usuario.apellido_paterno}.`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Continuar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#000000',
+                customClass: {
+                    popup: 'rounded-[32px] border-none shadow-2xl',
+                    confirmButton: 'rounded-xl px-6 py-3 font-bold text-sm',
+                    cancelButton: 'rounded-xl px-6 py-3 font-bold text-sm bg-slate-100 text-slate-500'
+                }
+            });
+
+            if (isConfirmed) editarUsuarioModal.mostrar(usuario);
+
+        } catch (error) {
+            usuarioView.notificarError('Error al cargar el usuario.');
+        }
+    },
+    /**
+ * Maneja el clic en los botones de Login Social (Google/Facebook)
+ */
+    async manejarLoginSocial(proveedor) {
+        try {
+            // 1. Bloqueamos la UI para evitar clics dobles
+            if (typeof usuarioView.mostrarLoading === 'function') {
+                usuarioView.mostrarLoading(true, `Conectando con ${proveedor}...`);
+            }
+
+            // 2. Llamamos al modelo (el que ya tiene la limpieza de tokens)
+            const resultado = await usuarioModel.loginConRedSocial(proveedor);
+
+            if (!resultado.exito) {
+                usuarioView.notificarError("Error al conectar: " + resultado.mensaje);
+            }
+            // Nota: Si tiene éxito, el navegador se redirigirá automáticamente a la página de Google/FB
+
+        } catch (error) {
+            console.error("Error crítico en el flujo de login:", error);
+            usuarioView.notificarError("Ocurrió un error inesperado al intentar iniciar sesión.");
+        } finally {
+            // 3. ¡IMPORTANTE! Desbloqueamos la UI si el proceso falla o se cancela
+            // Si no hacemos esto, el botón se queda "congelado" o con el spinner infinito
+            if (typeof usuarioView.mostrarLoading === 'function') {
+                usuarioView.mostrarLoading(false);
+            }
+        }
+    }
+};
+
+// Exposición global
+window.usuarioController = usuarioController;

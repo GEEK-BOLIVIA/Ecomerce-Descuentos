@@ -26,15 +26,28 @@ export const usuarioController = {
     },
 
     async gestionarRedireccionInicial() {
+        // === NUEVO: CONTROL DE INTERFAZ PARA EVITAR "PARPADEO" ===
+        const overlay = document.getElementById('loading-overlay');
+        const formularioLogin = document.getElementById('login-form'); // O el ID de tu contenedor de login
+
+        // Si detectamos el token de Supabase en la URL, ocultamos el login y mostramos carga
+        if (window.location.hash.includes('access_token')) {
+            overlay?.classList.remove('hidden');
+            formularioLogin?.classList.add('hidden');
+        }
+
         const sesion = await usuarioModel.obtenerSesionActual();
 
         // 1. Si NO hay sesión activa
         if (!sesion) {
+            // Si no hay sesión, nos aseguramos de ocultar el overlay para que el usuario pueda intentar loguearse
+            overlay?.classList.add('hidden');
+            formularioLogin?.classList.remove('hidden');
+
             const pathActual = window.location.pathname;
             const esPaginaPrivada = !pathActual.includes('index.html') && pathActual !== '/' && !pathActual.endsWith('/comercio/');
 
             if (esPaginaPrivada) {
-                // Usamos ./ para que busque el index en la carpeta actual (/comercio/)
                 window.location.href = './index.html';
             }
             return;
@@ -47,7 +60,9 @@ export const usuarioController = {
             const respuestaLogout = await usuarioModel.logout();
             usuarioView.notificarError("Acceso denegado: Tu correo no ha sido autorizado.");
 
-            // Redirigimos usando la URL dinámica calculada por el modelo
+            // Ocultamos overlay para que vea el mensaje de error de la notificación
+            overlay?.classList.add('hidden');
+
             setTimeout(() => {
                 window.location.href = respuestaLogout.urlRedireccion;
             }, 3000);
@@ -56,6 +71,9 @@ export const usuarioController = {
 
         // 3. Caso: Usuario Nuevo (Invitado) o Perfil Incompleto
         if (perfil.temporal || !perfil.ci || !perfil.celular) {
+            // Antes de mostrar el modal, ocultamos el overlay de carga
+            overlay?.classList.add('hidden');
+
             const nombresAuto = this._distribuirNombre(
                 auth.user_metadata?.full_name || auth.user_metadata?.name || ''
             );
@@ -90,13 +108,11 @@ export const usuarioController = {
                     sessionStorage.setItem('usuario_nombre', completado.nombres);
                     sessionStorage.setItem('usuario_id', auth.id);
 
-                    // Redirección relativa segura
                     setTimeout(() => window.location.href = './administracion.html', 1500);
                 } else {
                     usuarioView.notificarError("No se pudo guardar: " + (res?.mensaje || "Error desconocido"));
                 }
             } else {
-                // Si cierra el modal obligatorio, logout y fuera
                 const respuestaLogout = await usuarioModel.logout();
                 window.location.href = respuestaLogout.urlRedireccion;
             }
@@ -113,7 +129,7 @@ export const usuarioController = {
 
         if (enIndex) {
             console.log("Sesión válida encontrada. Entrando al panel...");
-            // Redirección relativa segura
+            // Mantenemos el overlay visible hasta que la página cambie de verdad
             window.location.href = './administracion.html';
         }
     },
@@ -242,7 +258,6 @@ export const usuarioController = {
             let resultado;
 
             if (id) {
-                // CASO A: Edición
                 resultado = await usuarioModel.actualizar(id, datos);
             } else {
                 // CASO B: Invitación
@@ -265,7 +280,9 @@ export const usuarioController = {
                     return;
                 }
 
+                // MODIFICACIÓN AQUÍ:
                 const datosInvitacion = {
+                    nombres: datos.nombres, // <--- CAPTURAMOS EL NOMBRE DE LA VISTA
                     correo_electronico: emailLimpio,
                     rol: this._estado.rolActual
                 };
@@ -414,28 +431,21 @@ export const usuarioController = {
  */
     async manejarLoginSocial(proveedor) {
         try {
-            // 1. Bloqueamos la UI para evitar clics dobles
-            if (typeof usuarioView.mostrarLoading === 'function') {
-                usuarioView.mostrarLoading(true, `Conectando con ${proveedor}...`);
-            }
+            // CAMBIO: Usa mostrarCargando en lugar de mostrarLoading
+            usuarioView.mostrarCargando(`Conectando con ${proveedor}...`);
 
-            // 2. Llamamos al modelo (el que ya tiene la limpieza de tokens)
             const resultado = await usuarioModel.loginConRedSocial(proveedor);
 
             if (!resultado.exito) {
                 usuarioView.notificarError("Error al conectar: " + resultado.mensaje);
             }
-            // Nota: Si tiene éxito, el navegador se redirigirá automáticamente a la página de Google/FB
-
         } catch (error) {
-            console.error("Error crítico en el flujo de login:", error);
-            usuarioView.notificarError("Ocurrió un error inesperado al intentar iniciar sesión.");
+            console.error("Error crítico:", error);
+            usuarioView.notificarError("Ocurrió un error inesperado.");
         } finally {
-            // 3. ¡IMPORTANTE! Desbloqueamos la UI si el proceso falla o se cancela
-            // Si no hacemos esto, el botón se queda "congelado" o con el spinner infinito
-            if (typeof usuarioView.mostrarLoading === 'function') {
-                usuarioView.mostrarLoading(false);
-            }
+            // Si usas SweetAlert dentro de mostrarCargando, 
+            // puedes cerrar el modal así si algo falla:
+            if (typeof Swal !== 'undefined') Swal.close();
         }
     }
 };

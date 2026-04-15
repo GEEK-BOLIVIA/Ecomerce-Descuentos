@@ -37,6 +37,10 @@
 </head>
 
 <body class="font-display bg-white text-geek-black antialiased">
+    <div id="loading-overlay" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center hidden">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+        <p class="mt-4 text-slate-600 font-medium">Verificando credenciales...</p>
+    </div>
     <div class="flex min-h-screen w-full flex-row overflow-hidden">
 
         <div class="relative hidden w-0 flex-1 flex-col justify-between bg-brand-dark p-12 lg:flex xl:w-1/2">

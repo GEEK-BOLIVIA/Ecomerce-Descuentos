@@ -103,45 +103,17 @@ export const usuarioModel = {
     /**
      * Cierra la sesión globalmente y limpia el storage local
      */
-    // Reemplaza el método logout en usuarioModel.js
     async logout() {
         try {
-            // 1. Cerrar sesión en Supabase
             await supabase.auth.signOut();
-
-            // 2. Limpiar datos de sesión del navegador
             sessionStorage.clear();
             localStorage.clear();
 
-            // 3. Limpieza de cookies de sesión
-            document.cookie.split(";").forEach((c) => {
-                document.cookie = c
-                    .replace(/^ +/, "")
-                    .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-            });
+            // En Hostinger, simplemente volvemos al origen (la raíz)
+            const nuevaUrl = window.location.origin;
 
-            // 4. CÁLCULO DE URL PARA GITHUB PAGES
-            // Obtenemos el origen (https://geek-bolivia.github.io)
-            const origin = window.location.origin;
-            // Obtenemos las partes de la ruta (/comercio/administracion.html -> ["", "comercio", "administracion.html"])
-            const pathParts = window.location.pathname.split('/');
-            // El nombre del repositorio suele ser la primera carpeta en la URL
-            const nombreRepo = pathParts[1];
-
-            // Construimos la URL final apuntando siempre al index de la subcarpeta
-            // Si estás en local (localhost:5500/index.html), nombreRepo será "index.html" o vacío,
-            // por eso añadimos una validación simple:
-            let nuevaUrl;
-            if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-                nuevaUrl = `${origin}/index.html`;
-            } else {
-                nuevaUrl = `${origin}/${nombreRepo}/index.html`;
-            }
-
-            console.log("Cierre de sesión exitoso. Redirigiendo a:", nuevaUrl);
             return { exito: true, urlRedireccion: nuevaUrl };
         } catch (error) {
-            console.error("Error al cerrar sesión:", error.message);
             return { exito: false, mensaje: error.message };
         }
     },

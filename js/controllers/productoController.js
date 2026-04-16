@@ -176,17 +176,23 @@ export const productoController = {
                 ...p,
                 id: p.id || p.producto_id,
                 nombre: p.nombre || p.producto_nombre || 'Sin nombre',
-                nombre_categoria: p.nombre_categoria || p.categoria_nombre || 'General'
+                nombre_categoria: p.nombre_categoria || p.categoria_nombre || 'General',
+                // Prioridad al campo codigo, fallback a sku o vacío
+                codigo: p.codigo || p.sku || ''
             }));
 
+            // Guardamos en memoria global para filtros rápidos si es necesario
             window.productosRaw = productosNormalizados;
+
+            // Renderizamos pasándole los datos ya limpios
             productoView.render(productosNormalizados, categorias, sucursales);
 
-            Swal.close(); // <-- AGREGAR: cierra el SweetAlert de sucursal si estaba abierto
+            // Cerramos cualquier alerta de carga o selección
+            if (typeof Swal !== 'undefined') Swal.close();
 
         } catch (error) {
             console.error('Error en refrescarVista:', error);
-            Swal.close(); // <-- AGREGAR también en el catch
+            if (typeof Swal !== 'undefined') Swal.close();
             productoView.notificarError?.('Error al cargar los productos.');
         }
     },

@@ -3,6 +3,7 @@ import { PaginationHelper } from '../utils/paginationHelper.js';
 import { productoStatsCards } from './components/productoStatsCards.js';
 import { productoFiltros } from './components/productoFiltros.js';
 import { productoTabla } from './components/productoTabla.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const productoView = {
 
@@ -14,13 +15,82 @@ export const productoView = {
         paginaActual: 1,
         filasPorPagina: 10,
         filtroStock: 'todos',
-        cargando: false,   // <-- AGREGAR
+        cargando: false,
     },
 
     // Datos auxiliares cacheados entre renders
     _categoriasDisponibles: [],
     _maestroCategorias: [],
     _sucursalesDisponibles: [],
+
+    // ─────────────────────────────────────────────
+    // LÓGICA DE SELECCIÓN POR LOTE (CORREGIDA)
+    // ─────────────────────────────────────────────
+
+    toggleLote(id) {
+        // Sincroniza con selectorUtil y actualiza la barra
+        selectorUtil.toggle(id, (cant) => this._actualizarBarraFlotante(cant));
+        // Refrescamos visualmente la fila sin re-renderizar toda la tabla para mayor fluidez
+        const fila = document.querySelector(`input[data-id="${id}"]`)?.closest('tr');
+        if (fila) {
+            const isChecked = selectorUtil.estado.seleccionados.includes(String(id));
+            fila.classList.toggle('bg-blue-50/70', isChecked);
+        }
+    },
+
+    toggleLoteTodos() {
+        const datosVisibles = this._filtrarDatos(window.productosRaw || []);
+        // Obtenemos solo los productos de la página actual para una selección más intuitiva
+        const inicio = (this._estado.paginaActual - 1) * this._estado.filasPorPagina;
+        const paged = datosVisibles.slice(inicio, inicio + this._estado.filasPorPagina);
+
+        selectorUtil.toggleTodos(paged, (cant) => this._actualizarBarraFlotante(cant));
+        productoController.refrescarVista(); // Re-render para marcar todos los checks
+    },
+
+    limpiarSeleccion() {
+        selectorUtil.limpiar((cant) => this._actualizarBarraFlotante(cant));
+        productoController.refrescarVista();
+    },
+
+    // Alias para el botón "X" de la barra flotante
+    limpiarSeleccionLote() {
+        this.limpiarSeleccion();
+    },
+
+    accionLote(accion, valor = null) {
+        const ids = selectorUtil.estado.seleccionados;
+        if (ids.length === 0) return;
+
+        if (accion === 'eliminar') {
+            this.confirmarEliminacionMasiva(ids);
+        } else {
+            const campo = (accion === 'whatsapp' || accion === 'habilitar_whatsapp') ? 'habilitar_whatsapp' : 'mostrar_precio';
+            productoController.toggleMasivoFiltrado(campo, valor, ids);
+        }
+    },
+
+    _actualizarBarraFlotante(cantidad) {
+        const barra = document.getElementById('bulk-actions-bar');
+        const contador = barra?.querySelector('.text-xs.font-bold'); // Ajustado al nuevo HTML de la tabla
+
+        if (!barra) return;
+
+        if (cantidad > 0) {
+            barra.classList.remove('translate-y-28', 'opacity-0', 'pointer-events-none');
+            barra.classList.add('translate-y-0', 'opacity-100');
+            if (contador) contador.textContent = `${cantidad} ítems`;
+        } else {
+            barra.classList.add('translate-y-28', 'opacity-0', 'pointer-events-none');
+            barra.classList.remove('translate-y-0', 'opacity-100');
+        }
+    },
+
+    // Este método ya no es necesario aquí porque el HTML vive en productoTabla.render()
+    // Sin embargo, lo mantenemos como helper si prefieres llamarlo por separado.
+    _renderBarraFlotante() {
+        return ''; // El HTML ahora está integrado en productoTabla para mejor reactividad
+    },
 
     // ─────────────────────────────────────────────
     // NOTIFICACIONES
@@ -55,16 +125,17 @@ export const productoView = {
             customClass: { popup: 'rounded-[32px] border-none shadow-xl' }
         });
     },
+
     mostrarSkeleton() {
         this._estado.cargando = true;
-        // Reemplaza solo el contenido de la tabla si ya existe en el DOM
         const tbody = document.querySelector('#content-area tbody');
         if (tbody) {
             tbody.innerHTML = productoTabla.renderSkeletonFilas(this._estado.filasPorPagina);
         }
     },
+
     // ─────────────────────────────────────────────
-    // RENDER PRINCIPAL — solo orquesta
+    // RENDER PRINCIPAL
     // ─────────────────────────────────────────────
     render(productos, todasLasCategorias = [], sucursales = []) {
         const contenedor = document.getElementById('content-area');
@@ -72,22 +143,20 @@ export const productoView = {
 
         this._sucursalesDisponibles = sucursales;
 
-        // Preservar foco del input activo
         const activeElementId = document.activeElement?.id ?? null;
         const cursorPosition = document.activeElement?.selectionStart ?? null;
 
-        // Cachear categorías si vienen nuevas
         if (todasLasCategorias.length > 0) {
             this._categoriasDisponibles = todasLasCategorias.map(c => c.nombre || c).filter(Boolean);
             this._maestroCategorias = todasLasCategorias;
         }
 
-        // Datos procesados
         const filtrados = this._ordenarDatos(this._filtrarDatos(productos));
+        window.productosMostrados = filtrados;
+
         const todosConWhatsapp = filtrados.length > 0 && filtrados.every(p => p.habilitar_whatsapp);
         const todosConPrecio = filtrados.length > 0 && filtrados.every(p => p.mostrar_precio);
 
-        // Stats para los botones de filtro (sobre el total sin filtrar por stock)
         const stats = {
             total: productos.length,
             conStock: productos.filter(p => p.stock > 0).length,
@@ -95,7 +164,6 @@ export const productoView = {
             agotados: productos.filter(p => p.stock === 0).length,
         };
 
-        // Helpers bound para pasar a los componentes
         const renderSwitch = this._renderSwitch.bind(this);
         const renderEtiquetas = this._renderEtiquetasFiltro.bind(this);
         const renderPag = (total) => this._generarPaginacion(total);
@@ -114,9 +182,8 @@ export const productoView = {
             .stock-btn  { transition: all 0.15s ease; }
         </style>
 
-        <div class="p-8 animate-fade-in max-h-[calc(100vh-64px)] overflow-y-auto">
+        <div class="p-8 animate-fade-in max-h-[calc(100vh-64px)] overflow-y-auto pb-32">
 
-            <!-- HEADER -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-7">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Gestión de Inventario</h1>
@@ -130,10 +197,8 @@ export const productoView = {
                 </button>
             </div>
 
-            <!-- COMPONENTE: Tarjetas de estadísticas -->
             ${productoStatsCards.render(productos)}
 
-            <!-- COMPONENTE: Barra de filtros -->
             ${productoFiltros.render(
             this._estado,
             this._sucursalesDisponibles,
@@ -145,12 +210,16 @@ export const productoView = {
             renderEtiquetas
         )}
 
-            <!-- COMPONENTE: Tabla de productos -->
             ${productoTabla.render(filtrados, this._estado, renderSwitch, renderPag, getColor)}
 
         </div>`;
 
-        // Restaurar foco
+        // Sincronización de UI después del render
+        setTimeout(() => {
+            selectorUtil.sincronizarChecks();
+            this._actualizarBarraFlotante(selectorUtil.estado.seleccionados.length);
+        }, 0);
+
         if (activeElementId) {
             setTimeout(() => {
                 const el = document.getElementById(activeElementId);
@@ -165,8 +234,9 @@ export const productoView = {
     },
 
     // ─────────────────────────────────────────────
-    // HELPERS PRIVADOS DE RENDER
+    // HELPERS DE RENDER
     // ─────────────────────────────────────────────
+
     _obtenerColorCategoria(nombre) {
         if (!nombre) return 'bg-slate-100 text-slate-500';
         const paleta = [
@@ -221,12 +291,7 @@ export const productoView = {
     },
 
     _generarPaginacion(total) {
-        return PaginationHelper.render(
-            total,
-            this._estado.filasPorPagina,
-            this._estado.paginaActual,
-            'productoView'
-        );
+        return PaginationHelper.render(total, this._estado.filasPorPagina, this._estado.paginaActual, 'productoView');
     },
 
     _obtenerNombreSucursalActual() {
@@ -235,18 +300,11 @@ export const productoView = {
         return suc ? suc.nombre : 'Sucursal seleccionada';
     },
 
-    // ─────────────────────────────────────────────
-    // FILTRADO Y ORDENACIÓN
-    // ─────────────────────────────────────────────
     _filtrarDatos(d) {
         let r = [...d];
-
-        // 1. Sucursal
         if (this._estado.sucursalSeleccionada !== 'todas') {
             r = r.filter(x => x.id_sucursal == this._estado.sucursalSeleccionada);
         }
-
-        // 2. Búsqueda textual
         if (this._estado.busqueda) {
             const t = this._estado.busqueda.toLowerCase();
             r = r.filter(x =>
@@ -255,8 +313,6 @@ export const productoView = {
                 x.categoria_padre_nombre?.toLowerCase().includes(t)
             );
         }
-
-        // 3. Categorías seleccionadas (etiquetas)
         if (this._estado.categoriasSeleccionadas.length > 0) {
             r = r.filter(x =>
                 this._estado.categoriasSeleccionadas.includes(x.nombre_categoria) ||
@@ -264,8 +320,6 @@ export const productoView = {
                 this._estado.categoriasSeleccionadas.includes(x.categoria_padre_nombre)
             );
         }
-
-        // 4. Filtro por stock
         if (this._estado.filtroStock === 'con-stock') {
             r = r.filter(x => x.stock > 0);
         } else if (this._estado.filtroStock === 'bajo-stock') {
@@ -273,7 +327,6 @@ export const productoView = {
         } else if (this._estado.filtroStock === 'agotados') {
             r = r.filter(x => x.stock === 0);
         }
-
         return r;
     },
 
@@ -285,13 +338,10 @@ export const productoView = {
         );
     },
 
-    // ─────────────────────────────────────────────
-    // HANDLERS DE EVENTOS (llamados desde el HTML)
-    // ─────────────────────────────────────────────
     gestionarBusqueda(v) {
         this._estado.busqueda = v;
         this._estado.paginaActual = 1;
-        this.mostrarSkeleton();  // Skeleton aquí
+        this.mostrarSkeleton();
         productoController.refrescarVista();
     },
 
@@ -317,7 +367,7 @@ export const productoView = {
     gestionarFiltroStock(filtro) {
         this._estado.filtroStock = filtro;
         this._estado.paginaActual = 1;
-        this.mostrarSkeleton();  // Skeleton aquí
+        this.mostrarSkeleton();
         productoController.refrescarVista();
     },
 
@@ -344,26 +394,23 @@ export const productoView = {
 
     cambiarPagina(p) {
         this._estado.paginaActual = p;
-        this.mostrarSkeleton();  // Skeleton aquí
+        this.mostrarSkeleton();
         productoController.refrescarVista();
     },
 
     filtrarSugerencias(query) {
         const panel = document.getElementById('suggestions-panel');
         if (!panel) return;
-
         const coincidencias = this._categoriasDisponibles.filter(cat =>
             cat.toLowerCase().includes(query.toLowerCase()) &&
             !this._estado.categoriasSeleccionadas.includes(cat)
         );
-
         if (query === '' || coincidencias.length === 0) {
             if (query === '') { panel.classList.add('hidden'); return; }
             panel.classList.remove('hidden');
             panel.innerHTML = `<div class="p-4 text-xs font-bold text-slate-400 text-center">Sin resultados</div>`;
             return;
         }
-
         panel.classList.remove('hidden');
         panel.innerHTML = coincidencias.map(cat => `
             <div onclick="productoView.agregarFiltroCategoria('${cat}')"
@@ -373,9 +420,6 @@ export const productoView = {
         `).join('');
     },
 
-    // ─────────────────────────────────────────────
-    // CONFIRMACIONES (SweetAlert)
-    // ─────────────────────────────────────────────
     confirmarCambioSwitch(id, campo, valorActual, esGlobal, nombre) {
         const nuevoEstado = !valorActual;
         const esWhatsApp = campo === 'ws_active' || campo === 'habilitar_whatsapp';
@@ -448,7 +492,30 @@ export const productoView = {
         }
     },
 
-    // Detalle en modal (SweetAlert)
+    confirmarEliminacionMasiva(ids) {
+        if (!ids || ids.length === 0) return;
+        Swal.fire({
+            title: `<span class="text-red-600 font-black uppercase text-xs">¿ELIMINAR ${ids.length} PRODUCTOS?</span>`,
+            html: `<p class="text-sm text-slate-600">Esta acción no se puede deshacer. Los productos seleccionados se borrarán del inventario permanentemente.</p>`,
+            icon: 'warning',
+            showCancelButton: true,
+            reverseButtons: true,
+            confirmButtonText: 'SÍ, ELIMINAR TODO',
+            cancelButtonText: 'CANCELAR',
+            confirmButtonColor: '#ef4444',
+            customClass: {
+                popup: 'rounded-[32px] shadow-2xl',
+                confirmButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase',
+                cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase'
+            }
+        }).then(r => {
+            if (r.isConfirmed) {
+                // Aquí llamas al método de eliminación masiva de tu controlador
+                productoController.eliminarMasivo?.(ids);
+            }
+        });
+    },
+
     async mostrarDetalle(p) {
         const niveles = p.nombre_categoria ? p.nombre_categoria.split(' > ') : ['General'];
         Swal.fire({

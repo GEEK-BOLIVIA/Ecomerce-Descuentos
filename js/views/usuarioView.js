@@ -30,7 +30,7 @@ export const usuarioView = {
     async mostrarModalCompletarPerfil(userId, datosSugeridos) {
         return await completarPerfilModal.mostrar(datosSugeridos);
     },
-    
+
     notificarError(mensaje) {
         Swal.fire({
             icon: 'error',
@@ -246,86 +246,185 @@ export const usuarioView = {
         usuarioController.previsualizarEliminacion(id);
     },
     /**
-     * FORMULARIO DINÁMICO PARA CREACIÓN (INVITACIÓN) O EDICIÓN
-     */
-    async mostrarFormularioUsuario({ titulo, datos, color, esEdicion }) {
+ * FORMULARIO DINÁMICO MEJORADO (CON SCROLL, BOTÓN X Y ALTO CONTRASTE)
+ */
+    async mostrarFormularioUsuario({ titulo, datos, color = 'blue', esEdicion }) {
         const { value: formValues } = await Swal.fire({
-            title: `<span class="text-slate-800 font-black uppercase text-sm">${titulo}</span>`,
+            title: `<span class="text-slate-900 font-black uppercase text-[16px] tracking-tight">${titulo}</span>`,
+            showCloseButton: true, // Agrega la X de cierre
+            closeButtonHtml: '&times;',
             html: `
-                <div class="text-left space-y-4 p-2">
-                    <p class="text-xs text-slate-500">
-                        ${esEdicion
-                    ? 'Modifica los datos básicos del perfil.'
-                    : 'Ingresa el correo para autorizar el acceso. El usuario completará su perfil al iniciar sesión.'}
-                    </p>
+        <div class="text-left px-2 py-1 max-h-[65vh] overflow-y-auto pr-4 custom-scrollbar" id="swal-scroll-container">
+            
+            ${!esEdicion ? `
+            <div class="flex bg-slate-100 p-1 rounded-2xl mb-6 max-w-sm mx-auto border border-slate-200">
+                <button id="btn-modo-invitacion" type="button" onclick="usuarioView._cambiarModoRegistro('invitacion')" 
+                    class="flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all bg-white shadow-sm text-slate-900">Invitación</button>
+                <button id="btn-modo-directo" type="button" onclick="usuarioView._cambiarModoRegistro('directo')" 
+                    class="flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all text-slate-500">Registro Directo</button>
+            </div>
+            ` : ''}
 
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Correo Electrónico</label>
-                        <input id="swal-email" type="email" 
-                               ${esEdicion ? 'disabled' : ''} 
-                               class="${esEdicion ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white shadow-sm border-slate-200'} w-full border rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-${color}-500/10 outline-none" 
-                               placeholder="ejemplo@correo.com" value="${datos.correo_electronico || ''}">
-                    </div>
+            <p id="form-descripcion" class="text-[11px] text-slate-600 leading-relaxed px-1 mb-6 text-center font-medium">
+                ${esEdicion ? 'Modifica los datos del perfil. La contraseña es opcional.' : 'Solo autoriza el correo y nombres. El usuario completará su perfil después.'}
+            </p>
 
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                
+                <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-900 uppercase ml-2 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[15px] text-slate-500">mail</span> Correo Electrónico
+                    </label>
+                    <input id="swal-email" type="email" ${esEdicion ? 'disabled' : ''} 
+                           class="${esEdicion ? 'bg-slate-50 text-slate-500' : 'bg-white text-slate-900'} w-full border border-blue-600/30 rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all" 
+                           placeholder="ejemplo@correo.com" value="${datos.correo_electronico || ''}">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-900 uppercase ml-2 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[15px] text-slate-500">person</span> Nombres
+                    </label>
+                    <input id="swal-nombres" 
+                           oninput="this.value = this.value.replace(/[0-9]/g, '')"
+                           class="w-full bg-white text-slate-900 border border-blue-600/30 rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all" 
+                           placeholder="Ej. Juan" value="${datos.nombres || ''}">
+                </div>
+
+                <div id="campos-expandidos" class="${!esEdicion ? 'hidden' : 'contents'} animate-fade-in">
                     <div class="space-y-1">
-                        <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre o Alias (Opcional)</label>
-                        <input id="swal-nombres" class="w-full bg-white shadow-sm border border-slate-200 rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-${color}-500/10 outline-none" 
-                               placeholder="Ej. Juan Perez" value="${datos.nombres || ''}">
+                        <label class="text-[10px] font-bold text-slate-900 uppercase ml-2 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[15px] text-slate-500">badge</span> Ap. Paterno
+                        </label>
+                        <input id="swal-paterno" 
+                               oninput="this.value = this.value.replace(/[0-9]/g, '')"
+                               class="w-full bg-white text-slate-900 border border-blue-600/30 rounded-xl py-3 px-4 text-sm outline-none focus:border-blue-600 transition-all" value="${datos.apellido_paterno || ''}">
                     </div>
                     
-                    ${esEdicion ? `
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-1">
-                            <label class="text-[10px] font-black text-slate-400 uppercase ml-2">C.I.</label>
-                            <input id="swal-ci" class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm outline-none" value="${datos.ci || ''}">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Celular</label>
-                            <input id="swal-celular" class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm outline-none" value="${datos.celular || ''}">
-                        </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-900 uppercase ml-2 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[15px] text-slate-500">badge</span> Ap. Materno
+                        </label>
+                        <input id="swal-materno" 
+                               oninput="this.value = this.value.replace(/[0-9]/g, '')"
+                               class="w-full bg-white text-slate-900 border border-blue-600/30 rounded-xl py-3 px-4 text-sm outline-none focus:border-blue-600 transition-all" value="${datos.apellido_materno || ''}">
                     </div>
-                    ` : ''}
+
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-900 uppercase ml-2 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[15px] text-slate-500">fingerprint</span> C.I. (Máx 7)
+                        </label>
+                        <input id="swal-ci" type="text" maxlength="7"
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                               class="w-full bg-white text-slate-900 border border-blue-600/30 rounded-xl py-3 px-4 text-sm outline-none focus:border-blue-600 transition-all" 
+                               placeholder="1234567" value="${datos.ci || ''}">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-900 uppercase ml-2 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[15px] text-slate-500">smartphone</span> Celular (8 dígitos)
+                        </label>
+                        <input id="swal-celular" type="text" maxlength="8"
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                               class="w-full bg-white text-slate-900 border border-blue-600/30 rounded-xl py-3 px-4 text-sm outline-none focus:border-blue-600 transition-all" 
+                               placeholder="70000000" value="${datos.celular || ''}">
+                    </div>
                 </div>
-            `,
+
+                <div id="contenedor-password" class="${!esEdicion ? 'hidden' : 'space-y-1'} md:col-span-2">
+                    <label class="text-[10px] font-bold text-slate-900 uppercase ml-2 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[15px] text-slate-500">lock</span> Contraseña
+                    </label>
+                    <div class="relative">
+                        <input id="swal-password" type="password" 
+                               class="w-full bg-white text-slate-900 border border-blue-600/30 rounded-xl py-3 px-4 text-sm focus:border-blue-600 outline-none transition-all" 
+                               placeholder="${esEdicion ? '•••••••• (Vacío para mantener)' : 'Mínimo 6 caracteres'}">
+                        <span class="material-symbols-outlined absolute right-4 top-3 text-slate-400 cursor-pointer hover:text-blue-700" 
+                              onclick="const p = document.getElementById('swal-password'); p.type = p.type === 'password' ? 'text' : 'password'; this.textContent = p.type === 'password' ? 'visibility' : 'visibility_off'">
+                            visibility
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+            /* Scrollbar personalizada para que sea sutil */
+            .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+            .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+            .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        </style>
+        `,
             showCancelButton: true,
-            confirmButtonText: esEdicion ? 'Guardar Cambios' : 'Autorizar Acceso',
+            confirmButtonText: esEdicion ? 'Actualizar Usuario' : 'Registrar Ahora',
             cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#000000',
+            confirmButtonColor: '#1d4ed8',
             customClass: {
-                popup: 'rounded-[32px] border-none shadow-2xl w-[90%] max-w-md',
-                confirmButton: 'rounded-xl px-8 py-3 font-bold text-sm uppercase transition-all hover:scale-105',
-                cancelButton: 'rounded-xl px-8 py-3 font-bold text-sm bg-slate-100 text-slate-500'
+                popup: 'rounded-[24px] border border-slate-200 shadow-2xl w-[95%] max-w-2xl',
+                confirmButton: 'rounded-xl px-10 py-3 font-bold text-sm uppercase transition-all hover:bg-blue-800',
+                cancelButton: 'rounded-xl px-10 py-3 font-bold text-sm bg-slate-200 text-slate-700',
+                closeButton: 'text-slate-400 hover:text-red-500 transition-colors focus:outline-none'
             },
             preConfirm: () => {
+                // ... (Lógica de validación exacta a la anterior)
                 const email = document.getElementById('swal-email').value.trim();
                 const nombres = document.getElementById('swal-nombres').value.trim();
+                const modoDirecto = !document.getElementById('campos-expandidos').classList.contains('hidden');
 
-                if (!email) {
-                    Swal.showValidationMessage('El correo electrónico es obligatorio');
+                if (!email || !nombres) {
+                    Swal.showValidationMessage('Complete los campos obligatorios');
                     return false;
                 }
 
-                // Estructura mínima para el controlador
                 const payload = {
                     correo_electronico: email,
-                    nombres: nombres || 'Nuevo Usuario',
-                    apellido_paterno: '',
-                    apellido_materno: '',
-                    ci: '',
-                    celular: ''
+                    nombres: nombres,
+                    apellido_paterno: document.getElementById('swal-paterno')?.value.trim() || '',
+                    apellido_materno: document.getElementById('swal-materno')?.value.trim() || '',
+                    ci: document.getElementById('swal-ci')?.value.trim() || '',
+                    celular: document.getElementById('swal-celular')?.value.trim() || '',
+                    password: document.getElementById('swal-password')?.value || ''
                 };
 
-                // Si es edición, capturamos los campos extra si existen
-                if (esEdicion) {
-                    payload.ci = document.getElementById('swal-ci').value.trim();
-                    payload.celular = document.getElementById('swal-celular').value.trim();
+                if (!esEdicion && modoDirecto) {
+                    if (payload.celular.length < 8) {
+                        Swal.showValidationMessage('El celular debe tener 8 dígitos');
+                        return false;
+                    }
+                    if (payload.password.length < 6) {
+                        Swal.showValidationMessage('La contraseña debe tener al menos 6 caracteres');
+                        return false;
+                    }
                 }
-
                 return payload;
             }
         });
 
         return formValues;
+    },
+
+    _cambiarModoRegistro(modo) {
+        const desc = document.getElementById('form-descripcion');
+        const campos = document.getElementById('campos-expandidos');
+        const pass = document.getElementById('contenedor-password');
+        const btnInv = document.getElementById('btn-modo-invitacion');
+        const btnDir = document.getElementById('btn-modo-directo');
+
+        if (modo === 'directo') {
+            desc.textContent = "Modo Registro Directo: Se requiere información completa del perfil.";
+            campos.classList.remove('hidden');
+            campos.classList.add('contents');
+            pass.classList.remove('hidden');
+            btnDir.className = "flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all bg-white shadow-sm text-slate-900";
+            btnInv.className = "flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all text-slate-400";
+        } else {
+            desc.textContent = "Modo Invitación: Solo nombre y correo. El usuario completará su perfil después.";
+            campos.classList.add('hidden');
+            campos.classList.remove('contents');
+            pass.classList.add('hidden');
+            btnInv.className = "flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all bg-white shadow-sm text-slate-900";
+            btnDir.className = "flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all text-slate-400";
+        }
     },
     async mostrarInvitacionesPendientes() {
         this.mostrarCargando('Cargando invitaciones...');

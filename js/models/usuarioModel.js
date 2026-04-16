@@ -300,9 +300,94 @@ export const usuarioModel = {
             return { exito: false, mensaje: error.message };
         }
     },
+
     async eliminarInvitacion(id) {
         const { error } = await supabase.from('whitelist').delete().eq('id', id);
         return { exito: !error, mensaje: error?.message };
     },
 
+    async crearUsuarioDirecto(datos) {
+        try {
+            const emailLimpio = datos.correo_electronico.toLowerCase().trim();
+
+            // 1. "Pre-autorización" en la whitelist
+            // Pasamos el rol para que el trigger de la DB lo valide correctamente
+            const { error: whiteError } = await supabase
+                .from('whitelist')
+                .upsert([{
+                    correo_electronico: emailLimpio,
+                    rol: datos.rol,
+                    nombres: datos.nombres
+                }]);
+
+            if (whiteError) throw new Error("Error en pre-autorización: " + whiteError.message);
+
+            // 2. Registro en Supabase Auth
+            // Esto dispara tu Trigger de PostgreSQL que inserta en la tabla 'usuario'
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: emailLimpio,
+                password: datos.password,
+                options: {
+                    data: { full_name: datos.nombres }
+                }
+            });
+
+            if (authError) throw authError;
+
+            // 3. Completar la información en la tabla 'usuario'
+            // Usamos un pequeño reintento lógico o aseguramos el ID del usuario creado
+            const { error: dbError } = await supabase
+                .from('usuario')
+                .update({
+                    nombres: datos.nombres,
+                    apellido_paterno: datos.apellido_paterno,
+                    apellido_materno: datos.apellido_materno,
+                    ci: datos.ci,
+                    celular: datos.celular,
+                    rol: datos.rol, // Aseguramos que el rol sea el correcto
+                    visible: true
+                })
+                .eq('id', authData.user.id);
+
+            if (dbError) throw dbError;
+
+            // 4. Limpiamos la whitelist para mantener el orden
+            await supabase.from('whitelist')
+                .delete()
+                .eq('correo_electronico', emailLimpio);
+
+            return { exito: true };
+        } catch (error) {
+            console.error("Fallo en creación directa:", error);
+            return { exito: false, mensaje: error.message };
+        }
+    },
+
+    async actualizarConPassword(id, datosPerfil, nuevaPassword = null) {
+        try {
+            // 1. Actualizar datos de perfil en la tabla 'usuario'
+            // (nombres, apellidos, ci, celular, etc.)
+            const { error: dbError } = await supabase
+                .from('usuario')
+                .update(datosPerfil)
+                .eq('id', id);
+
+            if (dbError) throw dbError;
+
+            // 2. Si hay una nueva contraseña, actualizarla en Supabase Auth
+            // Nota: Esto solo funciona si el ADMIN está logueado como el usuario 
+            // o si usas la API de Admin. En el flujo de cliente, actualiza al usuario actual.
+            if (nuevaPassword && nuevaPassword.trim() !== "") {
+                const { error: authError } = await supabase.auth.updateUser({
+                    password: nuevaPassword
+                });
+                if (authError) throw authError;
+            }
+
+            return { exito: true };
+        } catch (error) {
+            console.error("Error al actualizar perfil/password:", error);
+            return { exito: false, mensaje: error.message };
+        }
+    }
 };

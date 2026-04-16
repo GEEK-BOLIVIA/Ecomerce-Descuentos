@@ -252,40 +252,62 @@ export const usuarioController = {
     /**
      * Prepara y muestra el formulario de creación o edición
      */
-    async mostrarFormulario() {
-        const resultadoForm = await usuarioView.mostrarFormularioUsuario({
-            titulo: `Nuevo ${this._estado.configActual.rol}`,
-            datos: { nombres: '', correo_electronico: '', ci: '', celular: '' },
-            color: this._estado.configActual.color,
-            esEdicion: false
-        });
+    async mostrarFormulario(id = null) {
+        try {
+            // 1. Preparar datos iniciales
+            let datos = { nombres: '', correo_electronico: '', ci: '', celular: '' };
+            const titulo = id ? `Editar ${this._estado.configActual.rol}` : `Nuevo ${this._estado.configActual.rol}`;
 
-        if (resultadoForm) {
-            this.guardarUsuario(null, resultadoForm);
+            // 2. Si es edición, obtener datos del usuario
+            if (id) {
+                const usuarios = await usuarioModel.obtenerTodos(); // O usar un método obtenerPorId si lo tienes
+                const usuario = usuarios.find(u => u.id === id);
+                if (usuario) datos = { ...usuario };
+            }
+
+            // 3. Mostrar el modal (el que tiene el toggle de Invitación/Directo)
+            const resultadoForm = await usuarioView.mostrarFormularioUsuario({
+                titulo: titulo,
+                datos: datos,
+                color: this._estado.configActual.color,
+                esEdicion: !!id
+            });
+
+            // 4. Si el usuario confirmó el modal, procedemos a guardar
+            if (resultadoForm) {
+                // Importante: Inyectamos el ROL actual para evitar el error de base de datos
+                const payloadCompleto = {
+                    ...resultadoForm,
+                    rol: this._estado.rolActual
+                };
+                await this.guardarUsuario(id, payloadCompleto);
+            }
+        } catch (error) {
+            console.error("Error al mostrar formulario:", error);
+            usuarioView.notificarError("No se pudo abrir el formulario.");
         }
     },
+
     async guardarUsuario(id, datos) {
-        const mensajeCarga = id ? 'Actualizando datos...' : 'Enviando invitación...';
+        const esRegistroDirecto = datos.password && datos.password.trim() !== "";
+        const mensajeCarga = id ? 'Actualizando datos...' : (esRegistroDirecto ? 'Creando cuenta...' : 'Enviando invitación...');
+
         usuarioView.mostrarCargando(mensajeCarga);
 
         try {
             let resultado;
 
             if (id) {
-                resultado = await usuarioModel.actualizar(id, datos);
+                // --- CASO A: EDICIÓN ---
+                const { password, ...datosPerfil } = datos;
+                const passAEnviar = (password && password.trim() !== "") ? password : null;
+                resultado = await usuarioModel.actualizarConPassword(id, datosPerfil, passAEnviar);
+
             } else {
-                // CASO B: Invitación
-                const rolesRestringidos = ['owner', 'admin'];
-                const rolAInvitar = this._estado.rolActual.toLowerCase();
-
-                if (!rolesRestringidos.includes(rolAInvitar)) {
-                    usuarioView.notificarError(`El rol "${rolAInvitar}" no requiere invitación manual.`);
-                    return;
-                }
-
+                // --- CASO B: NUEVO REGISTRO ---
                 const emailLimpio = datos.correo_electronico.toLowerCase().trim();
 
-                // VALIDACIÓN: ¿Ya existe en la tabla de usuarios activos?
+                // 1. VALIDACIÓN: ¿Ya existe en la tabla de usuarios activos?
                 const usuariosExistentes = await usuarioModel.obtenerTodos();
                 const yaExiste = usuariosExistentes.some(u => u.correo_electronico === emailLimpio);
 
@@ -294,18 +316,32 @@ export const usuarioController = {
                     return;
                 }
 
-                // MODIFICACIÓN AQUÍ:
-                const datosInvitacion = {
-                    nombres: datos.nombres, // <--- CAPTURAMOS EL NOMBRE DE LA VISTA
-                    correo_electronico: emailLimpio,
-                    rol: this._estado.rolActual
-                };
+                // 2. DECISIÓN: ¿Invitación tradicional o Registro Directo?
+                if (esRegistroDirecto) {
+                    // Registro Directo (Crea Auth + Perfil usando el truco de la whitelist)
+                    resultado = await usuarioModel.crearUsuarioDirecto(datos);
+                } else {
+                    // Invitación Tradicional (Solo añade a la whitelist)
+                    const rolesRestringidos = ['owner', 'admin', 'vendedor']; // Ajusta según tu lógica
+                    const rolAInvitar = this._estado.rolActual.toLowerCase();
 
-                resultado = await usuarioModel.autorizarEnWhitelist(datosInvitacion);
+                    if (!rolesRestringidos.includes(rolAInvitar)) {
+                        usuarioView.notificarError(`El rol "${rolAInvitar}" no requiere invitación manual.`);
+                        return;
+                    }
+
+                    resultado = await usuarioModel.autorizarEnWhitelist({
+                        nombres: datos.nombres,
+                        correo_electronico: emailLimpio,
+                        rol: this._estado.rolActual
+                    });
+                }
             }
 
+            // 5. Manejo de respuesta final
             if (resultado.exito) {
-                usuarioView.notificarExito(id ? 'Perfil actualizado.' : `Invitación enviada a ${datos.correo_electronico}.`);
+                const msgFinal = id ? 'Perfil actualizado.' : (esRegistroDirecto ? 'Cuenta creada exitosamente.' : `Invitación enviada a ${datos.correo_electronico}.`);
+                usuarioView.notificarExito(msgFinal);
                 await this.refrescarVista();
             } else {
                 usuarioView.notificarError(resultado.mensaje);

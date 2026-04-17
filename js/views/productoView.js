@@ -28,9 +28,7 @@ export const productoView = {
     // ─────────────────────────────────────────────
 
     toggleLote(id) {
-        // Sincroniza con selectorUtil y actualiza la barra
         selectorUtil.toggle(id, (cant) => this._actualizarBarraFlotante(cant));
-        // Refrescamos visualmente la fila sin re-renderizar toda la tabla para mayor fluidez
         const fila = document.querySelector(`input[data-id="${id}"]`)?.closest('tr');
         if (fila) {
             const isChecked = selectorUtil.estado.seleccionados.includes(String(id));
@@ -40,20 +38,33 @@ export const productoView = {
 
     toggleLoteTodos() {
         const datosVisibles = this._filtrarDatos(window.productosRaw || []);
-        // Obtenemos solo los productos de la página actual para una selección más intuitiva
         const inicio = (this._estado.paginaActual - 1) * this._estado.filasPorPagina;
         const paged = datosVisibles.slice(inicio, inicio + this._estado.filasPorPagina);
 
+        // 1. Actualizamos el estado en el utilitario
         selectorUtil.toggleTodos(paged, (cant) => this._actualizarBarraFlotante(cant));
-        productoController.refrescarVista(); // Re-render para marcar todos los checks
-    },
 
+        // 2. En lugar de refrescar toda la vista, manipulamos el DOM existente
+        const checks = document.querySelectorAll('input[onchange*="toggleLote"]');
+        const isAllChecked = selectorUtil.estado.seleccionados.length >= paged.length;
+
+        checks.forEach(chk => {
+            chk.checked = isAllChecked;
+            const fila = chk.closest('tr');
+            if (fila) {
+                fila.classList.toggle('bg-blue-50/70', isAllChecked);
+            }
+        });
+
+        // 3. Sincronizamos el check del encabezado (el de "seleccionar todos")
+        const checkMaster = document.getElementById('check-all-master');
+        if (checkMaster) checkMaster.checked = isAllChecked;
+    },
     limpiarSeleccion() {
         selectorUtil.limpiar((cant) => this._actualizarBarraFlotante(cant));
         productoController.refrescarVista();
     },
 
-    // Alias para el botón "X" de la barra flotante
     limpiarSeleccionLote() {
         this.limpiarSeleccion();
     },
@@ -70,26 +81,66 @@ export const productoView = {
         }
     },
 
+    _renderBarraFlotante() {
+        return `
+        <div id="bulk-actions-bar" 
+             class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] 
+                    translate-y-28 opacity-0 pointer-events-none
+                    transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)">
+            <div class="bg-white/95 backdrop-blur-xl border border-slate-200 p-2.5 rounded-[26px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex items-center gap-2">
+                
+                <div class="flex items-center gap-3 px-4 py-2 border-r border-slate-100 mr-1">
+                    <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-blue-200 shadow-lg">
+                        <span class="material-symbols-outlined text-white text-xl">inventory_2</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span id="lote-contador-texto" class="text-[13px] font-bold text-slate-800 leading-none">0 seleccionados</span>
+                        <span class="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">Acciones masivas</span>
+                    </div>
+                </div>
+
+                <button onclick="productoView.accionLote('whatsapp', true)"
+                        class="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all duration-300 group">
+                    <i class="fa-brands fa-whatsapp text-xl group-hover:scale-110 transition-transform"></i>
+                    <span class="text-[11px] font-black uppercase tracking-tight">Activar WS</span>
+                </button>
+
+                <button onclick="productoView.accionLote('whatsapp', false)"
+                        class="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-50 text-slate-500 hover:bg-slate-800 hover:text-white transition-all duration-300 group">
+                    <i class="fa-brands fa-whatsapp text-xl opacity-60 group-hover:opacity-100 transition-opacity"></i>
+                    <span class="text-[11px] font-black uppercase tracking-tight">Desactivar WS</span>
+                </button>
+
+                <div class="w-px h-10 bg-slate-100 mx-1"></div>
+
+                <button onclick="productoView.accionLote('eliminar')"
+                        class="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 group">
+                    <span class="material-symbols-outlined text-lg group-hover:shake transition-transform">delete_sweep</span>
+                    <span class="text-[11px] font-black uppercase tracking-tight">Eliminar</span>
+                </button>
+
+                <button onclick="productoView.limpiarSeleccion()"
+                        class="w-11 h-11 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-all ml-1">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+        </div>`;
+    },
+
     _actualizarBarraFlotante(cantidad) {
         const barra = document.getElementById('bulk-actions-bar');
-        const contador = barra?.querySelector('.text-xs.font-bold'); // Ajustado al nuevo HTML de la tabla
+        const contador = barra?.querySelector('#lote-contador-texto');
 
         if (!barra) return;
 
         if (cantidad > 0) {
             barra.classList.remove('translate-y-28', 'opacity-0', 'pointer-events-none');
             barra.classList.add('translate-y-0', 'opacity-100');
-            if (contador) contador.textContent = `${cantidad} ítems`;
+            if (contador) contador.textContent = `${cantidad} seleccionados`;
         } else {
             barra.classList.add('translate-y-28', 'opacity-0', 'pointer-events-none');
             barra.classList.remove('translate-y-0', 'opacity-100');
         }
-    },
-
-    // Este método ya no es necesario aquí porque el HTML vive en productoTabla.render()
-    // Sin embargo, lo mantenemos como helper si prefieres llamarlo por separado.
-    _renderBarraFlotante() {
-        return ''; // El HTML ahora está integrado en productoTabla para mejor reactividad
     },
 
     // ─────────────────────────────────────────────
@@ -135,7 +186,7 @@ export const productoView = {
     },
 
     // ─────────────────────────────────────────────
-    // RENDER PRINCIPAL
+    // RENDER PRINCIPAL (CORREGIDO)
     // ─────────────────────────────────────────────
     render(productos, todasLasCategorias = [], sucursales = []) {
         const contenedor = document.getElementById('content-area');
@@ -211,6 +262,8 @@ export const productoView = {
         )}
 
             ${productoTabla.render(filtrados, this._estado, renderSwitch, renderPag, getColor)}
+
+            ${this._renderBarraFlotante()}
 
         </div>`;
 
@@ -510,7 +563,6 @@ export const productoView = {
             }
         }).then(r => {
             if (r.isConfirmed) {
-                // Aquí llamas al método de eliminación masiva de tu controlador
                 productoController.eliminarMasivo?.(ids);
             }
         });

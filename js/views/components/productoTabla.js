@@ -57,13 +57,13 @@ export const productoTabla = {
 
             <button onclick="productoController.toggleMasivoFiltrado('ws_active', true, selectorUtil.estado.seleccionados)" 
                     class="group flex items-center gap-2 px-4 py-2 hover:bg-emerald-50 text-emerald-700 rounded-full transition-all duration-200">
-                <span class="material-symbols-outlined text-lg group-hover:scale-110 transition-transform">chat</span>
+                <i class="fa-brands fa-whatsapp text-lg group-hover:scale-110 transition-transform"></i>
                 <span class="text-[11px] font-black uppercase tracking-tight">Activar WS</span>
             </button>
             
             <button onclick="productoController.toggleMasivoFiltrado('ws_active', false, selectorUtil.estado.seleccionados)" 
                     class="group flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-slate-600 rounded-full transition-all duration-200">
-                <span class="material-symbols-outlined text-lg group-hover:scale-110 transition-transform">comments_disabled</span>
+                <i class="fa-brands fa-whatsapp text-lg opacity-40 group-hover:scale-110 transition-transform"></i>
                 <span class="text-[11px] font-black uppercase tracking-tight">Desactivar WS</span>
             </button>
 
@@ -121,11 +121,17 @@ export const productoTabla = {
             const stockValor = parseInt(p.stock) || 0;
             const codigoValor = p.codigo || '---';
 
-            const precioTexto = esTodas && p.precio_rango && p.precio_rango !== String(p.precio)
-                ? `<span class="text-xs font-black text-slate-700">${p.precio_rango}</span>
-                   <span class="block text-[9px] text-slate-400 font-bold mt-0.5">rango por sucursal</span>`
-                : `<span class="text-sm font-black text-slate-700">Bs. ${p.precio}</span>`;
 
+            const esRangoReal = p.precio_rango && p.precio_rango !== String(p.precio);
+
+            const precioTexto = esTodas
+                ? `<div class="flex flex-col items-center">
+        <span class="text-sm font-black text-slate-700">Bs. ${esRangoReal ? p.precio_rango : p.precio}</span>
+        <span class="block text-[9px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">
+            ${esRangoReal ? 'Rango por sucursal' : 'Precio único'}
+        </span>
+       </div>`
+                : `<span class="text-sm font-black text-slate-700">Bs. ${p.precio}</span>`;
             const stockCelda = esTodas
                 ? `<div class="flex flex-col items-center gap-1">
                         ${TableWidgets.badge(stockValor, 'UDS')}
@@ -177,7 +183,9 @@ export const productoTabla = {
                     ${stockCelda}
                 </td>
                 <td class="px-6 py-5 text-center">
-                    ${renderSwitch(p.id, 'habilitar_whatsapp', p.habilitar_whatsapp, 'emerald', false, p.nombre)}
+                    <div class="flex justify-center">
+                        ${renderSwitch(p.id, 'habilitar_whatsapp', p.habilitar_whatsapp, 'emerald', false, p.nombre)}
+                    </div>
                 </td>
                 <td class="px-6 py-5 text-center">
                     ${renderSwitch(p.id, 'mostrar_precio', p.mostrar_precio, 'blue', false, p.nombre)}
@@ -193,7 +201,6 @@ export const productoTabla = {
         }).join('');
     },
 
-    // Función auxiliar para saber si todos los productos de la página están marcados
     _todosSeleccionados(datos, estado) {
         if (datos.length === 0) return false;
         const inicio = (estado.paginaActual - 1) * estado.filasPorPagina;

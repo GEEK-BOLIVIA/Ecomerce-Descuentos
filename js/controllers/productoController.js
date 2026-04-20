@@ -45,27 +45,21 @@ export const productoController = {
         }
     },
 
-    /**
- * PROCESAMIENTO MULTIMEDIA INTELIGENTE
- * Decide si subir a Supabase o mantener la URL actual.
- */
     async _procesarGaleria(galeriaRaw, nombreProducto) {
         if (!galeriaRaw || !Array.isArray(galeriaRaw)) return [];
 
         const promesas = galeriaRaw.map(async (item, index) => {
-            // Aseguramos que el orden sea un número, si no viene, usamos el index del array
-            const ordenFinal = (item.orden !== undefined && item.orden !== "")
-                ? parseInt(item.orden)
-                : index;
+            const ordenFinal = (item.orden !== undefined && item.orden !== '')
+                ? parseInt(item.orden) : index;
 
-            // 1. Archivo Nuevo
+            // Archivo nuevo
             if (item.file instanceof File) {
                 const url = await this._uploadToSupabase(item.file, 'galeria', nombreProducto);
                 const tipo = item.file.type.startsWith('video') ? 'video' : 'imagen';
-                return { url, tipo, orden: ordenFinal, nombre: item.nombre };
+                return { url, tipo, orden: ordenFinal, nombre: item.file.name }; // ← nombre real
             }
 
-            // 2. URL Existente (Mantenemos los datos actuales pero actualizamos el orden)
+            // URL existente
             if (typeof item.url === 'string' && item.url.startsWith('http')) {
                 return {
                     url: item.url,
@@ -79,7 +73,6 @@ export const productoController = {
         });
 
         const resultados = await Promise.all(promesas);
-        // Ordenamos el array antes de enviarlo a la base de datos
         return resultados.filter(res => res !== null).sort((a, b) => a.orden - b.orden);
     },
 
@@ -233,12 +226,13 @@ export const productoController = {
     async mostrarFormularioCrear() {
         try {
             // Carga paralela de lo necesario
-            const [categorias, sucursales] = await Promise.all([
-                categoriasModel.obtenerTodas(),
+            const [hijas, padres, sucursales] = await Promise.all([
+                categoriasModel.obtenerHijas(),
+                categoriasModel.obtenerPadres(),
                 sucursalModel.getAll()
             ]);
 
-            const datosForm = await productManager.start('content-area', categorias, {}, sucursales);
+            const datosForm = await productManager.start('content-area', hijas, {}, sucursales, padres);
 
             if (datosForm) {
                 productoView.mostrarCargando?.('Guardando producto...');
@@ -254,6 +248,7 @@ export const productoController = {
                 // 2. Crear producto base (sin precio ni stock — ahora van por sucursal)
                 const resultado = await productoModel.crear({
                     nombre: datosForm.nombre,
+                    codigo: datosForm.codigo,
                     descripcion: datosForm.descripcion,
                     ws_active: datosForm.ws_active,
                     price_visible: datosForm.price_visible,
@@ -294,34 +289,46 @@ export const productoController = {
     async mostrarFormularioEditar(id) {
         try {
             // Carga paralela incluyendo sucursales disponibles y las del producto
-            const [producto, categorias, categoriasVinculadas, galeriaActual, sucursales, sucursalesPrevias] = await Promise.all([
+            const [producto, hijas, padres, categoriasVinculadas, galeriaActual, sucursales, sucursalesPrevias] = await Promise.all([
                 productoModel.obtenerPorId(id),
-                categoriasModel.obtenerTodas(),
+                categoriasModel.obtenerHijas(),
+                categoriasModel.obtenerPadres(),
                 productoCategoriaModel.obtenerCategoriasPorProducto(id),
                 galeriaProductoModel.getByProducto(id),
                 sucursalModel.getAll(),
-                sucursalProductoModel.getByProducto(id) // [{ id_sucursal, precio, stock, visible }]
+                sucursalProductoModel.getByProducto(id)
             ]);
 
             if (!producto) throw new Error('Producto no encontrado');
 
+            let padreSeleccionadoId = null;
+            if (categoriasVinculadas.length > 0) {
+                const firstId = Number(categoriasVinculadas[0]);
+                const asHija = hijas.find(h => Number(h.id) === firstId);
+                if (asHija) padreSeleccionadoId = Number(asHija.id_padre);
+                else if (padres.some(p => Number(p.id) === firstId)) padreSeleccionadoId = firstId;
+            }
+
             const productoParaEdicion = {
                 id: producto.id,
                 nombre: producto.producto_nombre || producto.nombre || '',
+                codigo: producto.codigo || '',
                 descripcion: producto.descripcion || '',
                 ws_active: producto.habilitar_whatsapp === true,
                 price_visible: producto.mostrar_precio === true,
                 portada: producto.imagen_url || '',
                 categoriasIds: categoriasVinculadas || [],
                 galeria: galeriaActual || [],
-                sucursales: sucursalesPrevias || []  // ← datos previos de sucursal_producto
+                sucursales: sucursalesPrevias || [],
+                _padreSeleccionadoId: padreSeleccionadoId  // ← pista para start()
             };
 
             const datosEditados = await productManager.start(
                 'content-area',
-                categorias,
+                hijas,
                 productoParaEdicion,
-                sucursales  // ← lista completa de sucursales disponibles
+                sucursales,
+                padres   // ← 5to parámetro
             );
 
             if (datosEditados) {
@@ -339,6 +346,7 @@ export const productoController = {
                 // 2. Payload base — precio y stock ya NO van aquí
                 const updatePayload = {
                     nombre: datosEditados.nombre.trim(),
+                    codigo: datosEditados.codigo,
                     descripcion: datosEditados.descripcion.trim(),
                     ws_active: datosEditados.ws_active,
                     price_visible: datosEditados.price_visible,
@@ -403,6 +411,5 @@ export const productoController = {
         }
     }
 };
-
 window.productoController = productoController;
 window.configuracionColumnasController = configuracionColumnasController;

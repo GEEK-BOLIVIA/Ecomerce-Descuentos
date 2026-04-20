@@ -33,7 +33,39 @@ export const categoriasModel = {
             return [];
         }
     },
+    // Pegar estos 2 métodos dentro de categoriasModel, después de obtenerTodas()
 
+    async obtenerPadres() {
+        try {
+            const { data, error } = await supabase
+                .from('categoria')
+                .select('id, nombre')
+                .eq('visible', true)
+                .is('id_padre', null)
+                .order('nombre', { ascending: true });
+            if (error) throw error;
+            return data;
+        } catch (err) {
+            console.error('Error en obtenerPadres:', err.message);
+            return [];
+        }
+    },
+
+    async obtenerHijas() {
+        try {
+            const { data, error } = await supabase
+                .from('categoria')
+                .select('id, nombre, id_padre')
+                .eq('visible', true)
+                .not('id_padre', 'is', null)
+                .order('nombre', { ascending: true });
+            if (error) throw error;
+            return data;
+        } catch (err) {
+            console.error('Error en obtenerHijas:', err.message);
+            return [];
+        }
+    },
     /**
      * Obtiene una categoría específica por su ID incluyendo datos del padre.
      */

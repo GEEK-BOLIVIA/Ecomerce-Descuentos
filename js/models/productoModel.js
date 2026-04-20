@@ -53,6 +53,7 @@ export const productoModel = {
         try {
             const payload = {
                 nombre: datos.nombre ? datos.nombre.trim() : 'Sin Nombre',
+                codigo: datos.codigo || null,
                 descripcion: datos.descripcion || '',
                 imagen_url: datos.portada || '',
                 visible: true,
@@ -78,6 +79,7 @@ export const productoModel = {
         try {
             const datosLimpios = {
                 nombre: cambios.nombre || cambios.producto_nombre,
+                codigo: cambios.codigo,
                 descripcion: cambios.descripcion,
                 imagen_url: cambios.imagen_url || cambios.portada,
                 mostrar_precio: cambios.mostrar_precio !== undefined ? cambios.mostrar_precio
@@ -185,7 +187,7 @@ export const productoModel = {
         try {
             const { data, error } = await supabase
                 .from('producto')
-                .select('id, nombre, imagen_url, precio, visible')
+                .select('id, nombre, imagen_url, codigo, visible')
                 .ilike('nombre', `%${termino}%`)
                 .eq('visible', true)
                 .limit(10);
@@ -195,10 +197,10 @@ export const productoModel = {
             // NORMALIZACIÓN CORREGIDA:
             // Usamos los nombres reales de las columnas de tu tabla 'producto'
             return data.map(p => ({
-                id: p.id,               // Antes decía p.producto_id (Error)
-                nombre: p.nombre,       // Antes decía p.producto_nombre (Error)
-                imagen: p.imagen_url,   // Correcto
-                precio: p.precio        // ¡Faltaba incluir esto!
+                id: p.id,
+                nombre: p.nombre,
+                imagen: p.imagen_url,
+                codigo: p.codigo
             }));
         } catch (err) {
             console.error('Error buscando productos:', err.message);

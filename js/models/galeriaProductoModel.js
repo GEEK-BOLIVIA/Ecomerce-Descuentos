@@ -26,24 +26,23 @@ export const galeriaProductoModel = {
         }
     },
 
-    /**
-     * MÉTODO PRIVADO: Normalización de datos
-     * Evita que se guarden objetos JSON en columnas de texto (URL).
-     */
     _normalizarItem(item) {
         let urlFinal = '';
         let tipoFinal = 'imagen';
+        let nombreFinal = '';
 
         if (typeof item === 'string') {
             urlFinal = item;
         } else if (item && typeof item === 'object') {
             urlFinal = item.url || item.file_url || '';
             tipoFinal = item.tipo || 'imagen';
+            nombreFinal = item.nombre || '';
         }
 
         return {
             url: String(urlFinal).trim(),
-            tipo: String(tipoFinal).toLowerCase().includes('video') ? 'video' : 'imagen'
+            tipo: String(tipoFinal).toLowerCase().includes('video') ? 'video' : 'imagen',
+            nombre: String(nombreFinal).trim()
         };
     },
 
@@ -60,6 +59,7 @@ export const galeriaProductoModel = {
                     id_producto: data.idProducto,
                     url: cleaned.url,
                     tipo: cleaned.tipo,
+                    nombre: cleaned.nombre,   // ← AGREGADO
                     orden: parseInt(data.orden) || 0,
                     visible: true
                 }])
@@ -87,12 +87,11 @@ export const galeriaProductoModel = {
                     id_producto: idProducto,
                     url: cleaned.url,
                     tipo: cleaned.tipo,
+                    nombre: cleaned.nombre,   // ← AGREGADO
                     orden: parseInt(item.orden) || 0,
                     visible: true
                 };
             });
-
-            console.log(`DB: Intentando insertar lote de ${payload.length} elementos para producto ${idProducto}`);
 
             const { data, error } = await supabase
                 .from('galeria_producto')
@@ -100,8 +99,6 @@ export const galeriaProductoModel = {
                 .select();
 
             if (error) throw error;
-
-            console.log("DB: Lote insertado correctamente.");
             return { exito: true, data };
         } catch (error) {
             console.error("Model Error [createLote]:", error.message);
@@ -152,15 +149,6 @@ export const galeriaProductoModel = {
         }
     },
 
-    /**
-     * Borrado físico (Limpieza total por producto)
-     * Crucial para el proceso de Edición: Borra todo para evitar duplicados 
-     * antes de re-insertar el nuevo estado de la galería.
-     */
-    /**
- * Borrado físico de la galería para un producto.
- * Esto limpia el espacio antes de insertar el nuevo orden/archivos.
- */
     async limpiarGaleria(idProducto) {
         try {
             console.log(`DB: Ejecutando DELETE físico para producto ${idProducto}`);

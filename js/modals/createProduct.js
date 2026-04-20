@@ -24,13 +24,21 @@ export const productManager = {
     _datosTemporales: {
         ws_active: true,
         price_visible: true,
+        codigo: '',
         nombre: '',
         descripcion: ''
     },
+
     _resolve: null,
     _originalContent: null,
     _mainContainer: null,
     _searchTerm: '',
+    _padreSeleccionadoId: null,
+    _categoriasPadresList: [],
+
+    _htmlEscape(s) {
+        return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    },
 
     _initDragGaleria() {
         const container = document.getElementById('galeria-drag-container');
@@ -202,7 +210,8 @@ export const productManager = {
     // ─────────────────────────────────────────────
     // INICIALIZACIÓN
     // ─────────────────────────────────────────────
-    async start(containerId, categorias, dPrevios = {}, sucursalesDisponibles = []) {
+    async start(containerId, categorias, dPrevios = {}, sucursalesDisponibles = [], categoriasPadres = []) {
+        this._padreSeleccionadoId = null;
         this._mainContainer = document.getElementById(containerId);
         if (!this._mainContainer) return;
 
@@ -215,6 +224,8 @@ export const productManager = {
         this._sucursalesDisponibles = sucursalesDisponibles;
         this._precioBase = '';
         this._stockBase = '';
+        this._padreSeleccionadoId = null;
+        this._categoriasPadresList = Array.isArray(categoriasPadres) ? categoriasPadres : [];
 
         this._originalContent = this._mainContainer.innerHTML;
         window.categoriasRaw = categorias;
@@ -224,7 +235,8 @@ export const productManager = {
             descripcion: dPrevios.descripcion || '',
             ws_active: dPrevios.ws_active !== undefined ? dPrevios.ws_active : true,
             price_visible: dPrevios.price_visible !== undefined ? dPrevios.price_visible : true,
-            id: dPrevios.id || null
+            id: dPrevios.id || null,
+            codigo: dPrevios.codigo != null ? String(dPrevios.codigo).replace(/\D/g, '').slice(0, 13) : '',
         };
 
         this._categoriasSeleccionadas = dPrevios.categoriasIds || [];
@@ -291,7 +303,6 @@ export const productManager = {
 
         return new Promise(resolve => { this._resolve = resolve; });
     },
-
     // ─────────────────────────────────────────────
     // RENDER PRINCIPAL
     // ─────────────────────────────────────────────
@@ -305,7 +316,7 @@ export const productManager = {
         let contenidoPaso = '';
         switch (this._pasoActual) {
             case 1: contenidoPaso = stepInfo.render(d); break;
-            case 2: contenidoPaso = stepCategorias.render(seleccionadas); break;
+            case 2: contenidoPaso = stepCategorias.render(this); break;
             case 3: contenidoPaso = stepMultimedia.render(this._portadaArchivo.url, this._renderGaleriaList()); break;
             case 4: contenidoPaso = stepSucursales.render(this._sucursalesAsignadas, this._precioBase, this._stockBase); break;
         }
@@ -313,92 +324,127 @@ export const productManager = {
         const primeraAsignada = this._sucursalesAsignadas[0];
 
         container.innerHTML = `
-        <div class="h-full w-full bg-slate-50/50 overflow-y-auto custom-scrollbar p-6 relative">
+    <div class="h-full min-h-0 w-full flex flex-col overflow-y-auto lg:overflow-hidden bg-slate-100/90 custom-scrollbar px-5 pt-4 pb-5 lg:px-8 lg:pt-5 lg:pb-6">
 
-            <div class="absolute top-4 right-10 z-[100]">
-                <button onclick="window.productManager.cancelarEdicion()"
-                        class="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-100 rounded-xl shadow-sm transition-all group active:scale-95">
-                    <span class="text-[9px] font-black uppercase tracking-tighter">Cancelar y Volver</span>
-                    <span class="material-symbols-outlined text-lg group-hover:rotate-90 transition-transform">close</span>
-                </button>
+        <header class="shrink-0 flex flex-wrap items-center justify-between gap-4 mb-5 lg:mb-6 max-w-[1360px] mx-auto w-full border-b border-slate-200/80 pb-4">
+            <div class="min-w-0 flex-1 pr-2">
+                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Editor de producto</p>
+                <p class="text-sm text-slate-600 mt-0.5">Completa los pasos y revisa la vista previa a la derecha.</p>
             </div>
+            <button type="button" onclick="window.productManager.cancelarEdicion()"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:text-red-700 hover:border-red-200 transition-colors shrink-0 ml-auto lg:ml-0">
+                <span class="material-symbols-outlined text-[20px] text-slate-500">close</span>
+                Cerrar
+            </button>
+        </header>
 
-            <div class="max-w-[1400px] mx-auto grid grid-cols-12 gap-10 mt-8">
+        <div class="max-w-[1360px] mx-auto w-full grid grid-cols-12 gap-6 lg:gap-10 overflow-y-auto custom-scrollbar max-h-[calc(100vh-8rem)]">
 
-                <!-- FORMULARIO -->
-                <div class="col-span-12 lg:col-span-7 bg-white rounded-[3rem] shadow-xl border border-slate-100 flex flex-col min-h-[800px]">
+            <!-- FORMULARIO -->
+            <div class="col-span-12 lg:col-span-7 bg-white rounded-xl shadow-sm border border-slate-200/90 flex flex-col min-h-[800px] lg:min-h-0 overflow-hidden">
 
-                    <div class="flex bg-slate-50/50 border-b rounded-t-[3rem] overflow-hidden">
-                        ${this._renderTab(1, 'edit_square', 'Información')}
-                        ${this._renderTab(2, 'account_tree', 'Categorías')}
-                        ${this._renderTab(3, 'media_output', 'Multimedia')}
-                        ${this._renderTab(4, 'storefront', 'Sucursales')}
-                    </div>
-
-                    <div class="p-10 flex-1 overflow-y-auto custom-scrollbar">
-                        ${contenidoPaso}
-                    </div>
-
-                    <div class="p-8 bg-slate-50 border-t flex justify-between items-center rounded-b-[3rem]">
-                        <button onclick="window.productManager.irPaso(${this._pasoActual - 1})"
-                                class="font-black text-[10px] uppercase text-slate-400 hover:text-slate-700 transition-colors flex items-center gap-1 ${this._pasoActual === 1 ? 'invisible' : ''}">
-                            <span class="material-symbols-outlined text-sm">arrow_back</span> Atrás
-                        </button>
-
-                        <div class="flex items-center gap-2">
-                            ${[1, 2, 3, 4].map(n => `
-                                <div class="h-2 rounded-full transition-all ${n === this._pasoActual ? 'bg-blue-600 w-6' : n < this._pasoActual ? 'bg-blue-300 w-2' : 'bg-slate-200 w-2'}"></div>
-                            `).join('')}
-                        </div>
-
-                        <button onclick="window.productManager.navSiguiente()"
-                                class="px-10 py-4 bg-blue-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2">
-                            ${this._pasoActual === 4
-                ? `<span class="material-symbols-outlined text-sm">save</span> Guardar`
-                : `Siguiente <span class="material-symbols-outlined text-sm">arrow_forward</span>`}
-                        </button>
-                    </div>
+                <div class="flex shrink-0 items-stretch border-b border-slate-200 bg-slate-50 rounded-t-xl overflow-hidden gap-px">
+                    ${this._renderTab(1, 'edit_square', 'Información')}
+                    ${this._renderTab(2, 'account_tree', 'Categorías')}
+                    ${this._renderTab(3, 'media_output', 'Multimedia')}
+                    ${this._renderTab(4, 'storefront', 'Sucursales')}
                 </div>
 
-                <!-- PREVIEW -->
-                <div class="col-span-12 lg:col-span-5">
-                    <div class="sticky top-12 bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border border-slate-100 transform rotate-1">
-                        <div class="aspect-square bg-slate-100 relative">
-                            ${this._portadaArchivo.url
-                ? `<img src="${this._portadaArchivo.url}" class="w-full h-full object-cover">`
-                : `<div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-8xl text-slate-200">image</span></div>`}
+                <div class="p-6 sm:p-8 flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
+                    ${contenidoPaso}
+                </div>
+
+                <div class="px-5 py-4 sm:px-6 bg-slate-50 border-t border-slate-200 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-b-xl">
+                    <button type="button" onclick="window.productManager.irPaso(${this._pasoActual - 1})"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors ${this._pasoActual === 1 ? 'invisible pointer-events-none' : ''}">
+                        <span class="material-symbols-outlined text-[18px]">arrow_back</span> Atrás
+                    </button>
+                    <div class="flex items-center gap-1.5 order-last sm:order-none w-full sm:w-auto justify-center sm:justify-start">
+                        ${[1, 2, 3, 4].map(n => `<span class="h-1.5 rounded-full transition-all ${n === this._pasoActual ? 'bg-blue-600 w-6' : n < this._pasoActual ? 'bg-blue-300 w-1.5' : 'bg-slate-300 w-1.5'}"></span>`).join('')}
+                    </div>
+                    <button type="button" onclick="window.productManager.navSiguiente()"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-blue-700 transition-colors">
+                        ${this._pasoActual === 4
+                ? `<span class="material-symbols-outlined text-[18px]">save</span> Guardar`
+                : `Siguiente <span class="material-symbols-outlined text-[18px]">arrow_forward</span>`}
+                    </button>
+                </div>
+            </div>
+
+            <!-- PREVIEW -->
+            <div class="col-span-12 lg:col-span-5 min-h-0 flex flex-col lg:h-full">
+                <div class="sticky top-4 lg:top-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col ring-1 ring-slate-900/[0.04]">
+                    <div class="shrink-0 px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white flex items-center gap-2">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
+                            <span class="material-symbols-outlined text-[18px]">visibility</span>
+                        </span>
+                        <span class="block text-xs font-semibold text-slate-800 tracking-tight">Vista previa</span>
+                    </div>
+
+                    <div class="overflow-y-auto overflow-x-hidden custom-scrollbar">
+                        <div class="p-4 sm:p-5 flex flex-col gap-4">
+
+                            <div class="rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-[4/3] relative shadow-inner">
+                                ${this._portadaArchivo.url
+                ? `<img src="${this._portadaArchivo.url}" alt="" class="w-full h-full object-cover">`
+                : `<div class="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50">
+                    <span class="material-symbols-outlined text-5xl opacity-35">image</span>
+                    <span class="text-xs mt-2 text-slate-400 font-medium">Añada una imagen de portada</span>
+               </div>`}
+                                ${primeraAsignada ? `
+                                <div class="absolute top-3 right-3 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg font-semibold text-blue-600 text-xs shadow-md uppercase">
+                                    STOCK: <span class="preview-stock">${primeraAsignada.stock || 0}</span>
+                                </div>` : ''}
+                            </div>
+
+                            <div class="space-y-1">
+                                <h2 class="preview-nombre text-lg font-semibold text-slate-900 leading-snug break-words">
+                                    ${d.nombre || 'Nombre del Producto'}
+                                </h2>
+                                <p class="text-[11px] text-slate-400">Título público del producto</p>
+                            </div>
+
+                            ${seleccionadas.length > 0 ? `
+                            <div class="space-y-1.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Categorías</span>
+                                <div class="flex flex-wrap gap-1.5">
+                                    ${seleccionadas.map(s => `
+                                        <span class="px-2 py-1 rounded-md bg-white border border-slate-200 text-[11px] font-medium text-slate-700 shadow-sm">${s.nombre}</span>
+                                    `).join('')}
+                                </div>
+                            </div>` : `
+                            <p class="text-[11px] text-slate-400 border-t border-slate-100 pt-3">
+                                Sin categorías asignadas aún.
+                            </p>`}
+
                             ${primeraAsignada ? `
-                            <div class="absolute top-8 right-8 bg-white/90 backdrop-blur px-4 py-2 rounded-2xl font-black text-blue-600 text-xs shadow-xl uppercase">
-                                STOCK: <span class="preview-stock">${primeraAsignada.stock || 0}</span>
-                            </div>` : ''}
-                        </div>
-                        <div class="p-10 space-y-4">
-                            <h2 class="preview-nombre text-2xl font-black text-slate-900 leading-tight">
-                                ${d.nombre || 'Nombre del Producto'}
-                            </h2>
-                            ${primeraAsignada ? `
-                            <div class="preview-price-box pt-4 border-t border-slate-100" style="opacity:${d.price_visible ? '1' : '0'}">
-                                <p class="text-[10px] font-black text-slate-400 uppercase">Precio</p>
-                                <p class="text-3xl font-black text-slate-900 tracking-tighter">
-                                    ${primeraAsignada.precio || '0.00'} <span class="text-sm uppercase">Bs</span>
+                            <div class="preview-price-box pt-3 border-t border-slate-200" style="opacity:${d.price_visible ? '1' : '0'}">
+                                <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Precio de venta</p>
+                                <p class="text-2xl font-semibold text-slate-900 tracking-tight tabular-nums">
+                                    <span class="preview-precio">${primeraAsignada.precio || '0.00'}</span>
+                                    <span class="text-sm font-medium text-slate-500 ml-1">Bs</span>
                                 </p>
                             </div>` : `
-                            <p class="text-[11px] text-slate-400 font-bold pt-4 border-t border-slate-100">
-                                Asigna una sucursal en el paso 4 para ver el precio
+                            <p class="text-[11px] text-slate-400 font-medium pt-3 border-t border-slate-100">
+                                Asigna una sucursal en el paso 4 para ver el precio.
                             </p>`}
+
                             ${this._sucursalesAsignadas.length > 0 ? `
-                            <div class="flex flex-wrap gap-2 pt-2">
+                            <div class="flex flex-wrap gap-1.5 pt-1">
                                 ${this._sucursalesAsignadas.map(s => `
-                                    <span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase border border-blue-100">
+                                    <span class="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-md text-[10px] font-semibold uppercase border border-blue-100">
                                         ${s.nombre}
                                     </span>`).join('')}
                             </div>` : ''}
+
                         </div>
                     </div>
                 </div>
-
             </div>
-        </div>`;
+
+        </div>
+    </div>`;
+
         if (this._pasoActual === 3) {
             this._initDragGaleria();
         }
@@ -474,6 +520,9 @@ export const productManager = {
         const d = this._datosTemporales;
 
         if (this._pasoActual === 1) {
+            const cod = String(d.codigo || '').replace(/\D/g, '');
+            if (!/^\d{13}$/.test(cod)) return this._alertError('El código debe tener exactamente 13 dígitos numéricos.');
+            d.codigo = cod;
             if (!d.nombre.trim()) return this._alertError('El nombre del producto es obligatorio');
             if (!d.descripcion.trim()) return this._alertError('La descripción es obligatoria');
         }
@@ -512,6 +561,7 @@ export const productManager = {
 
             const dataFinal = {
                 id: d.id || null,
+                codigo: String(d.codigo || '').replace(/\D/g, ''),
                 nombre: d.nombre.trim(),
                 descripcion: d.descripcion.trim(),
                 ws_active: d.ws_active ? 1 : 0,
@@ -574,20 +624,36 @@ export const productManager = {
             if (box) box.style.opacity = el.checked ? '1' : '0';
         }
     },
+    sincronizarCodigo(el) {
+        const solo = String(el?.value ?? '').replace(/\D/g, '').slice(0, 13);
+        if (el) el.value = solo;
+        this._datosTemporales.codigo = solo;
+    },
 
-    async cambiarPortada(metodo) {
+    cambiarPortada(metodo) {
         if (metodo === 'camera') {
-            const cap = await this._cameraEngine.abrir('foto');
-            if (cap) { this._portadaArchivo = { tipo: 'imagen', data: cap.archivo, url: cap.url }; this.updateUI(); }
+            this._cameraEngine.abrir('foto').then(cap => {
+                if (cap) { this._portadaArchivo = { tipo: 'imagen', data: cap.archivo, url: cap.url }; this.updateUI(); }
+            });
             return;
         }
-        if (metodo === 'local') {
-            const { value: file } = await Swal.fire({ title: 'Cargar Imagen Local', input: 'file', inputAttributes: { accept: 'image/*' } });
-            if (file) { this._portadaArchivo = { tipo: 'imagen', data: file, url: URL.createObjectURL(file) }; this.updateUI(); }
-        } else {
-            const { value: url } = await Swal.fire({ title: 'Vincular URL de Imagen', input: 'url' });
-            if (url) { this._portadaArchivo = { tipo: 'imagen', data: null, url }; this.updateUI(); }
+        if (metodo === 'url') {
+            Swal.fire({ title: 'Vincular URL de Imagen', input: 'url' }).then(({ value: url }) => {
+                if (url) { this._portadaArchivo = { tipo: 'imagen', data: null, url }; this.updateUI(); }
+            });
+            return;
         }
+        // metodo === 'local' — abrir explorador directo, sin modal intermedio
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            this._portadaArchivo = { tipo: 'imagen', data: file, url: URL.createObjectURL(file) };
+            this.updateUI();
+        };
+        input.click();
     },
 
     async addGaleriaManual() {
@@ -604,8 +670,8 @@ export const productManager = {
                 <div>
                     <label class="text-[10px] font-black uppercase text-slate-400 block mb-2 px-1">Carga</label>
                     <select id="swal-metodo" class="w-full bg-slate-100 border-none rounded-xl p-4 font-bold outline-none">
-                        <option value="url">URL / Enlace</option>
                         <option value="local">Archivo Local</option>
+                        <option value="url">URL / Enlace</option>
                         <option value="camera">Cámara Nexus</option>
                     </select>
                 </div>
@@ -616,29 +682,73 @@ export const productManager = {
 
         if (!fv) return;
         const [tipoManual, metodo] = fv;
-        let url = '', file = null, nombre = '';
 
         if (metodo === 'camera') {
             const res = await this._cameraEngine.abrir(tipoManual);
-            if (res) { url = res.url; file = res.archivo; nombre = res.nombre; }
-        } else if (metodo === 'local') {
-            const { value: f } = await Swal.fire({ title: 'Subir Archivo', input: 'file', inputAttributes: { accept: tipoManual === 'video' ? 'video/*' : 'image/*' } });
-            if (f) { file = f; url = URL.createObjectURL(f); nombre = f.name; }
-        } else {
-            const { value: u } = await Swal.fire({ title: 'Pegar URL', input: 'url' });
-            if (u) { url = u; nombre = tipoManual.toUpperCase(); }
+            if (res) {
+                this._galeriaArchivos.push({
+                    id: Date.now().toString() + Math.random(),
+                    tipo: tipoManual, url: res.url, file: res.archivo,
+                    thumb: tipoManual === 'video' ? 'https://cdn-icons-png.flaticon.com/512/1179/1179120.png' : res.url,
+                    nombre: res.nombre, orden: this._galeriaArchivos.length + 1
+                });
+                this.updateUI();
+            }
+            return;
         }
 
-        if (url) {
-            this._galeriaArchivos.push({
-                id: Date.now().toString() + Math.random(),
-                tipo: tipoManual, url, file,
-                thumb: tipoManual === 'video' ? 'https://cdn-icons-png.flaticon.com/512/1179/1179120.png' : url,
-                nombre, orden: this._galeriaArchivos.length + 1
-            });
-            this._galeriaArchivos.sort((a, b) => a.orden - b.orden);
-            this.updateUI();
+        if (metodo === 'url') {
+            const { value: u } = await Swal.fire({ title: 'Pegar URL', input: 'url' });
+            if (u) {
+                this._galeriaArchivos.push({
+                    id: Date.now().toString() + Math.random(),
+                    tipo: tipoManual, url: u, file: null,
+                    thumb: tipoManual === 'video' ? 'https://cdn-icons-png.flaticon.com/512/1179/1179120.png' : u,
+                    nombre: tipoManual === 'video' ? 'Video externo' : 'Imagen externa',
+                    orden: this._galeriaArchivos.length + 1
+                });
+                this.updateUI();
+            }
+            return;
         }
+
+        // metodo === 'local' — input directo con multiple, Promise.all para procesar
+        await new Promise((resolve) => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = tipoManual === 'video' ? 'video/*' : 'image/*';
+            input.multiple = true;
+            input.onchange = async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length === 0) { resolve(); return; }
+
+                // Promise.all — procesar todos los archivos en paralelo
+                const nuevos = await Promise.all(files.map(async (file) => {
+                    const url = URL.createObjectURL(file);
+                    const esVideo = file.type.startsWith('video/');
+                    return {
+                        id: Date.now().toString() + Math.random(),
+                        tipo: esVideo ? 'video' : tipoManual,
+                        url,
+                        file,
+                        thumb: esVideo ? 'https://cdn-icons-png.flaticon.com/512/1179/1179120.png' : url,
+                        nombre: file.name, // ← nombre real del archivo
+                        orden: 0 // se recalcula abajo
+                    };
+                }));
+
+                // Asignar orden continuando desde el último
+                const base = this._galeriaArchivos.length;
+                nuevos.forEach((item, i) => { item.orden = base + i + 1; });
+
+                this._galeriaArchivos.push(...nuevos);
+                this._galeriaArchivos.sort((a, b) => a.orden - b.orden);
+                this.updateUI();
+                resolve();
+            };
+            input.oncancel = () => resolve();
+            input.click();
+        });
     },
 
     eliminarArchivo(id) {
@@ -672,11 +782,165 @@ export const productManager = {
             </div>`).join('');
     },
 
+    // REEMPLAZAR toggleHija completo:
     toggleHija(id) {
-        this._categoriasSeleccionadas = this._categoriasSeleccionadas.includes(id)
-            ? this._categoriasSeleccionadas.filter(i => i !== id)
-            : [...this._categoriasSeleccionadas, id];
+        const n = Number(id);
+        if (Number(this._categoriasSeleccionadas[0]) === n) this._categoriasSeleccionadas = [];
+        else this._categoriasSeleccionadas = [n];
         this.updateUI();
+    },
+
+    onCambioPadre(val) {
+        const pid = val === '' || val == null ? null : parseInt(String(val), 10);
+        if (pid == null || Number.isNaN(pid)) {
+            this._padreSeleccionadoId = null;
+            this._categoriasSeleccionadas = [];
+            this.updateUI();
+            return;
+        }
+        this._padreSeleccionadoId = pid;
+        const hijos = (window.categoriasRaw || []).filter(h => Number(h.id_padre) === pid);
+        // Si no tiene hijos, la categoría padre ES la selección
+        if (hijos.length === 0) {
+            this._categoriasSeleccionadas = [pid];
+        } else {
+            const cur = this._categoriasSeleccionadas[0];
+            if (cur != null && !hijos.some(h => Number(h.id) === Number(cur))) {
+                this._categoriasSeleccionadas = [];
+            }
+        }
+        this.updateUI();
+    },
+
+    limpiarCategoriaProducto() {
+        this._categoriasSeleccionadas = [];
+        this.updateUI();
+    },
+
+    async _recargarCategorias() {
+        try {
+            const { categoriasModel } = await import('../models/categoriasModel.js');
+            const [padres, hijas] = await Promise.all([
+                categoriasModel.obtenerPadres(),
+                categoriasModel.obtenerHijas()
+            ]);
+            this._categoriasPadresList = padres;
+            window.categoriasRaw = hijas;
+            this.updateUI();
+        } catch (err) {
+            console.error('Error al recargar categorías:', err);
+        }
+    },
+
+    async mostrarFormCrearCategoria() {
+        const { value: formValues } = await Swal.fire({
+            title: '<span class="text-slate-800 font-black uppercase text-sm">Nueva Categoría</span>',
+            html: `
+                <div class="text-left space-y-5 pt-4">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre</label>
+                        <input id="swal-nombre-cat" type="text"
+                               class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-2xl p-4 font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none"
+                               placeholder="Ej. Medicamentos, Cosméticos...">
+                    </div>
+                </div>`,
+            showCloseButton: true, showCancelButton: true,
+            confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar', reverseButtons: true,
+            didOpen: () => document.getElementById('swal-nombre-cat')?.focus(),
+            customClass: {
+                popup: 'rounded-[32px] border-none shadow-2xl',
+                confirmButton: 'rounded-xl px-6 py-3 font-bold text-sm uppercase bg-blue-600',
+                cancelButton: 'rounded-xl px-6 py-3 font-bold text-sm uppercase bg-slate-100 text-slate-500'
+            },
+            preConfirm: () => {
+                const v = document.getElementById('swal-nombre-cat').value.trim();
+                if (!v) { Swal.showValidationMessage('El nombre es obligatorio'); return false; }
+                return { nombre: v };
+            }
+        });
+
+        if (formValues) {
+            Swal.fire({
+                title: '<span class="text-slate-800 font-black uppercase text-sm">Creando...</span>',
+                allowOutsideClick: false, didOpen: () => Swal.showLoading(),
+                customClass: { popup: 'rounded-[32px] shadow-xl' }
+            });
+            const { categoriasModel } = await import('../models/categoriasModel.js');
+            const res = await categoriasModel.crear({ nombre: formValues.nombre, visible: true, id_padre: null });
+            Swal.close();
+            if (res.exito) { this._alertExito('Categoría creada'); await this._recargarCategorias(); }
+            else this._alertError('No se pudo crear la categoría');
+        }
+    },
+
+    async mostrarFormCrearSubcategoria() {
+        if (this._categoriasPadresList.length === 0)
+            return this._alertError('No hay categorías padre. Cree primero una categoría.');
+
+        const svgIcon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E";
+        const optionsPadres = this._categoriasPadresList
+            .map(p => `<option value="${p.id}">${this._htmlEscape(p.nombre)}</option>`).join('');
+
+        const { value: formValues } = await Swal.fire({
+            title: '<span class="text-slate-800 font-black uppercase text-sm">Nueva Subcategoría</span>',
+            html: `
+                <div class="text-left space-y-5 pt-4">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre</label>
+                        <input id="swal-nombre-subcat" type="text"
+                               class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-2xl p-4 font-semibold focus:ring-2 focus:ring-blue-500/20 outline-none"
+                               placeholder="Ej. Analgésicos, Labiales...">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoría Padre</label>
+                        <div class="relative">
+                            <select id="swal-id-padre-subcat"
+                                    style="appearance:none;-webkit-appearance:none;background-image:url('${svgIcon}');background-repeat:no-repeat;background-position:right 1.25rem center;background-size:1.25rem;padding-right:3rem;"
+                                    class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-2xl p-4 font-semibold outline-none cursor-pointer">
+                                <option value="">-- Seleccione --</option>
+                                ${optionsPadres}
+                            </select>
+                        </div>
+                    </div>
+                </div>`,
+            showCloseButton: true, showCancelButton: true,
+            confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar', reverseButtons: true,
+            didOpen: () => document.getElementById('swal-nombre-subcat')?.focus(),
+            customClass: {
+                popup: 'rounded-[32px] border-none shadow-2xl',
+                confirmButton: 'rounded-xl px-6 py-3 font-bold text-sm uppercase bg-emerald-600',
+                cancelButton: 'rounded-xl px-6 py-3 font-bold text-sm uppercase bg-slate-100 text-slate-500'
+            },
+            preConfirm: () => {
+                const nombre = document.getElementById('swal-nombre-subcat').value.trim();
+                const padre = document.getElementById('swal-id-padre-subcat').value;
+                if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false; }
+                if (!padre) { Swal.showValidationMessage('Seleccione una categoría padre'); return false; }
+                return { nombre, id_padre: parseInt(padre) };
+            }
+        });
+
+        if (formValues) {
+            Swal.fire({
+                title: '<span class="text-slate-800 font-black uppercase text-sm">Creando...</span>',
+                allowOutsideClick: false, didOpen: () => Swal.showLoading(),
+                customClass: { popup: 'rounded-[32px] shadow-xl' }
+            });
+            const { categoriasModel } = await import('../models/categoriasModel.js');
+            const res = await categoriasModel.crear({ nombre: formValues.nombre, visible: true, id_padre: formValues.id_padre });
+            Swal.close();
+            if (res.exito) { this._alertExito('Subcategoría creada'); await this._recargarCategorias(); }
+            else this._alertError('No se pudo crear la subcategoría');
+        }
+    },
+
+    _alertExito(msg) {
+        Swal.fire({
+            icon: 'success',
+            title: '<span class="text-slate-800 font-black uppercase text-sm">¡Operación Exitosa!</span>',
+            text: msg, timer: 2000, showConfirmButton: false,
+            customClass: { popup: 'rounded-[32px] border-none shadow-xl' }
+        });
     },
 
     // ─────────────────────────────────────────────
@@ -851,17 +1115,15 @@ export const productManager = {
     // UTILIDADES
     // ─────────────────────────────────────────────
     _renderTab(num, icon, label) {
-        const active = this._pasoActual === num;
-        const completed = num < this._pasoActual;
+        const active = num === this._pasoActual;
+        const done = num < this._pasoActual;
         return `
-        <button onclick="window.productManager.irPaso(${num})"
-                class="flex-1 py-6 flex flex-col items-center gap-1.5 border-b-4 transition-all
-                       ${active ? 'border-blue-600 text-blue-600 bg-white'
-                : completed ? 'border-blue-200 text-blue-400 hover:bg-slate-50'
-                    : 'border-transparent text-slate-400 hover:bg-slate-50'}">
-            <span class="material-symbols-outlined text-xl">${completed && !active ? 'check_circle' : icon}</span>
-            <span class="text-[9px] font-black uppercase tracking-widest hidden sm:block">${label}</span>
-        </button>`;
+    <button type="button" onclick="window.productManager.irPaso(${num})"
+            class="flex-1 flex items-center justify-center gap-2 py-3.5 px-2 text-sm font-medium transition-colors min-w-0
+                   ${active ? 'text-blue-700 bg-white shadow-[inset_0_-2px_0_0_#2563eb]' : done ? 'text-slate-600 hover:bg-white/70' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}">
+        <span class="material-symbols-outlined text-[20px] shrink-0 ${done && !active ? 'text-blue-600' : ''}">${done && !active ? 'check_circle' : icon}</span>
+        <span class="hidden sm:inline truncate">${label}</span>
+    </button>`;
     },
 
     _alertError(mensaje) {
@@ -889,17 +1151,21 @@ export const productManager = {
         });
     },
 
-    injectStyles() {
+ injectStyles() {
         if (document.getElementById('nexus-pm-styles')) return;
-        const style = document.createElement('style');
-        style.id = 'nexus-pm-styles';
-        style.innerHTML = `
-            .custom-scrollbar::-webkit-scrollbar       { width: 5px; }
-            .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-            .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        `;
-        document.head.appendChild(style);
-    }
+        const s = document.createElement('style');
+        s.id = 'nexus-pm-styles';
+        s.innerHTML = `
+        .custom-scrollbar::-webkit-scrollbar       { width:5px }
+        .custom-scrollbar::-webkit-scrollbar-track { background:transparent }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background:#e2e8f0; border-radius:10px }
+
+        .galeria-item { user-select:none; transition: box-shadow .15s ease, background .15s ease; }
+        .galeria-item.is-dragging  { opacity:.4; box-shadow:0 8px 24px rgba(0,0,0,.15); }
+        .galeria-item.drag-over    { border-color:#3b82f6 !important; background:#eff6ff !important; box-shadow:0 0 0 2px #bfdbfe; }
+    `;
+        document.head.appendChild(s);
+    },
 };
 
 window.productManager = productManager;

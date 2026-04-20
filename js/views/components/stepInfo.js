@@ -1,13 +1,20 @@
 /**
  * stepInfo.js
  * Paso 1 del formulario de producto
- * Responsabilidad: Renderizar los campos de información básica
  */
 
 export const stepInfo = {
     render(d) {
         return `
         <div class="space-y-6">
+            <div class="space-y-2">
+                <label class="text-[10px] font-black uppercase text-slate-400 ml-4">Código de Barras (13 dígitos)</label>
+                <input type="text" inputmode="numeric" maxlength="13"
+                       value="${d.codigo || ''}"
+                       oninput="window.productManager.sincronizarCodigo(this)"
+                       class="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-6 py-4 font-mono font-semibold tracking-widest outline-none focus:border-blue-600 transition-colors"
+                       placeholder="0000000000000">
+            </div>
             <div class="space-y-2">
                 <label class="text-[10px] font-black uppercase text-slate-400 ml-4">Nombre del Producto</label>
                 <input type="text" value="${d.nombre}"

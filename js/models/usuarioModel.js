@@ -389,5 +389,22 @@ export const usuarioModel = {
             console.error("Error al actualizar perfil/password:", error);
             return { exito: false, mensaje: error.message };
         }
+    },
+    async obtenerUsuarioActual() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+
+        const { data, error } = await supabase
+            .from('usuario')
+            .select('id, rol')
+            .eq('correo_electronico', user.email.toLowerCase())
+            .maybeSingle();
+
+        if (error) {
+            console.error('Error obtener usuario:', error);
+            return null;
+        }
+
+        return data;
     }
 };

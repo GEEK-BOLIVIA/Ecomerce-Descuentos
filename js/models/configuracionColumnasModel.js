@@ -45,7 +45,6 @@ export const configuracionColumnasModel = {
      */
     async guardarConfiguracion(config) {
         try {
-            // En configuracionColumnasModel.js
             const esUsuario = !!(config.usuario_id && config.usuario_id !== 'null');
 
             const payload = {
@@ -55,24 +54,29 @@ export const configuracionColumnasModel = {
                 rol_id: esUsuario ? null : config.rol_id
             };
 
-            // Ahora que creamos las constraints, esto coincidirá perfectamente
-            const columnasConflicto = esUsuario
-                ? 'tabla_nombre,usuario_id'
-                : 'tabla_nombre,rol_id';
-
-            const { error } = await supabase
+            // ELIMINAR CONFIG ANTERIOR
+            let deleteQuery = supabase
                 .from('configuracion_columnas')
-                .upsert(payload, {
-                    onConflict: columnasConflicto
-                });
-            if (error) {
-                console.error('Error detallado de Supabase:', error);
-                throw error;
+                .delete()
+                .eq('tabla_nombre', config.tabla_nombre);
+
+            if (esUsuario) {
+                deleteQuery = deleteQuery.eq('usuario_id', config.usuario_id);
+            } else {
+                deleteQuery = deleteQuery.eq('rol_id', config.rol_id);
             }
 
+            await deleteQuery;
+
+            // INSERTAR NUEVA
+            const { error } = await supabase
+                .from('configuracion_columnas')
+                .insert(payload);
+
+            if (error) throw error;
             return { exito: true };
         } catch (err) {
-            console.error('Error crítico en guardarConfiguracion:', err.message);
+            console.error('Error guardar config:', err.message);
             return { exito: false, mensaje: err.message };
         }
     },

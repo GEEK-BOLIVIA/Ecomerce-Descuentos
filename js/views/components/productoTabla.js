@@ -3,7 +3,10 @@ import { selectorUtil } from '../../utils/selectorUtil.js';
 
 export const productoTabla = {
 
-    render(datos, estado, renderSwitch, renderPag, getColor) {
+    render(datos, estado, columnasVisibles, renderSwitch, renderPag, getColor) {
+        const cols = columnasVisibles.length > 0 ? columnasVisibles :
+            ['nro', 'imagen', 'nombre_producto', 'categoria', 'codigo', 'precio', 'stock', 'whatsapp', 'precio_pub', 'acciones'];
+
         const esTodas = estado.sucursalSeleccionada === 'todas';
         const numSeleccionados = selectorUtil.estado.seleccionados.length;
         const mostrarBarra = numSeleccionados > 0;
@@ -14,6 +17,7 @@ export const productoTabla = {
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-slate-50/80">
+                            ${cols.includes('nro') ? `
                             <th class="px-6 py-5 w-10 text-center">
                                 <input type="checkbox" id="checkbox-header" 
                                        onclick="productoView.toggleLoteTodos()" 
@@ -21,21 +25,36 @@ export const productoTabla = {
                                        class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4">
                             </th>
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase w-20 text-center">N°</th>
+                            ` : ''}
+                            ${(cols.includes('imagen') || cols.includes('nombre_producto') || cols.includes('categoria')) ? `
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase">Producto / Categoría</th>
+                            ` : ''}
+                            ${cols.includes('codigo') ? `
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center">Código</th>
+                            ` : ''}
+                            ${cols.includes('precio') ? `
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center">
                                 ${esTodas ? 'Precio (Bs)' : 'Precio'}
                             </th>
+                            ` : ''}
+                            ${cols.includes('stock') ? `
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center">
                                 ${esTodas ? 'Stock Total' : 'Stock'}
                             </th>
+                            ` : ''}
+                            ${cols.includes('whatsapp') ? `
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center">WhatsApp</th>
+                            ` : ''}
+                            ${cols.includes('precio_pub') ? `
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center">Precio Pub.</th>
+                            ` : ''}
+                            ${cols.includes('acciones') ? `
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center w-48">Acciones</th>
+                            ` : ''}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        ${this._renderFilas(datos, estado, renderSwitch, getColor, esTodas)}
+                        ${this._renderFilas(datos, estado, cols, renderSwitch, getColor, esTodas)}
                     </tbody>
                 </table>
             </div>
@@ -94,18 +113,14 @@ export const productoTabla = {
         </div>`;
     },
 
-    _renderFilas(datos, estado, renderSwitch, getColor, esTodas) {
+    _renderFilas(datos, estado, cols, renderSwitch, getColor, esTodas) {
         if (datos.length === 0) {
-            return `
-            <tr>
-                <td colspan="9" class="px-6 py-16 text-center">
-                    <div class="flex flex-col items-center gap-3 text-slate-400">
-                        <span class="material-symbols-outlined text-[48px] opacity-30">inventory_2</span>
-                        <p class="text-sm font-bold uppercase tracking-wide">Sin productos que mostrar</p>
-                        <p class="text-xs">Prueba cambiando los filtros activos</p>
-                    </div>
-                </td>
-            </tr>`;
+            return `<tr><td colspan="15" class="px-6 py-16 text-center">
+                <div class="flex flex-col items-center gap-3 text-slate-400">
+                    <span class="material-symbols-outlined text-[48px] opacity-30">inventory_2</span>
+                    <p class="text-sm font-bold uppercase tracking-wide">Sin productos</p>
+                </div>
+            </td></tr>`;
         }
 
         const inicio = (estado.paginaActual - 1) * estado.filasPorPagina;
@@ -114,89 +129,88 @@ export const productoTabla = {
         return paged.map((p, i) => {
             const idStr = String(p.id);
             const estaSeleccionado = selectorUtil.estado.seleccionados.includes(idStr);
-
             const dataEnc = btoa(unescape(encodeURIComponent(JSON.stringify(p))));
-            const nombreMostrarCat = p.categoria_padre_nombre || 'General';
-            const colorCat = getColor(nombreMostrarCat);
+            const nombreCat = p.categoria_padre_nombre || 'General';
+            const colorCat = getColor(nombreCat);
             const stockValor = parseInt(p.stock) || 0;
             const codigoValor = p.codigo || '---';
-
-
             const esRangoReal = p.precio_rango && p.precio_rango !== String(p.precio);
 
             const precioTexto = esTodas
                 ? `<div class="flex flex-col items-center">
-        <span class="text-sm font-black text-slate-700">Bs. ${esRangoReal ? p.precio_rango : p.precio}</span>
-        <span class="block text-[9px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">
-            ${esRangoReal ? 'Rango por sucursal' : 'Precio único'}
-        </span>
-       </div>`
+                    <span class="text-sm font-black text-slate-700">Bs. ${esRangoReal ? p.precio_rango : p.precio}</span>
+                    <span class="block text-[9px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">
+                        ${esRangoReal ? 'Rango' : 'Único'}
+                    </span>
+                   </div>`
                 : `<span class="text-sm font-black text-slate-700">Bs. ${p.precio}</span>`;
+
             const stockCelda = esTodas
                 ? `<div class="flex flex-col items-center gap-1">
-                        ${TableWidgets.badge(stockValor, 'UDS')}
-                        <span class="text-[9px] text-slate-400 font-bold">
-                            ${p.total_sucursales || 1} sucursal${(p.total_sucursales || 1) !== 1 ? 'es' : ''}
-                        </span>
+                    ${TableWidgets.badge(stockValor, 'UDS')}
+                    <span class="text-[9px] text-slate-400 font-bold">
+                        ${p.total_sucursales || 1} sucursal${(p.total_sucursales || 1) !== 1 ? 'es' : ''}
+                    </span>
                    </div>`
                 : TableWidgets.badge(stockValor, 'UDS');
 
             return `
             <tr class="hover:bg-blue-50/40 transition-colors group ${estaSeleccionado ? 'bg-blue-50/70' : ''}">
+                ${cols.includes('nro') ? `
                 <td class="px-6 py-5 text-center">
-                    <input type="checkbox" 
-                           class="fila-checkbox rounded border-slate-300 text-blue-600 cursor-pointer w-4 h-4" 
-                           data-id="${idStr}" 
-                           onclick="productoView.toggleLote('${idStr}')"
-                           ${estaSeleccionado ? 'checked' : ''}>
+                    <input type="checkbox" class="fila-checkbox rounded border-slate-300 text-blue-600 cursor-pointer w-4 h-4" 
+                           data-id="${idStr}" onclick="productoView.toggleLote('${idStr}')" ${estaSeleccionado ? 'checked' : ''}>
                 </td>
-                <td class="px-6 py-5 text-center text-xs font-bold text-slate-400">
-                    ${inicio + i + 1}
-                </td>
+                <td class="px-6 py-5 text-center text-xs font-bold text-slate-400">${inicio + i + 1}</td>
+                ` : ''}
+                ${(cols.includes('imagen') || cols.includes('nombre_producto') || cols.includes('categoria')) ? `
                 <td class="px-6 py-5">
                     <div class="flex items-center gap-3">
+                        ${cols.includes('imagen') ? `
                         <div class="h-11 w-11 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 flex items-center justify-center border border-slate-100 shadow-sm">
-                            ${p.imagen_url
-                    ? `<img src="${p.imagen_url}" class="h-full w-full object-cover">`
-                    : `<span class="material-symbols-outlined text-slate-300 text-base">hide_image</span>`
-                }
+                            ${p.imagen_url ? `<img src="${p.imagen_url}" class="h-full w-full object-cover">`
+                            : `<span class="material-symbols-outlined text-slate-300 text-base">hide_image</span>`}
                         </div>
+                        ` : ''}
                         <div class="flex flex-col text-left">
-                            <span class="text-slate-800 font-bold uppercase text-[12px] tracking-wide mb-1 leading-none">
-                                ${p.nombre}
-                            </span>
-                            <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase w-fit ${colorCat}">
-                                ${nombreMostrarCat}
-                            </span>
+                            ${cols.includes('nombre_producto') ? `
+                            <span class="text-slate-800 font-bold uppercase text-[12px] tracking-wide mb-1 leading-none">${p.nombre}</span>
+                            ` : ''}
+                            ${cols.includes('categoria') ? `
+                            <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase w-fit ${colorCat}">${nombreCat}</span>
+                            ` : ''}
                         </div>
                     </div>
                 </td>
+                ` : ''}
+                ${cols.includes('codigo') ? `
                 <td class="px-6 py-5 text-center">
-                    <span class="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md border border-slate-200/50">
-                        ${codigoValor}
-                    </span>
+                    <span class="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md border border-slate-200/50">${codigoValor}</span>
                 </td>
-                <td class="px-6 py-5 text-center">
-                    ${precioTexto}
-                </td>
-                <td class="px-6 py-5 text-center">
-                    ${stockCelda}
-                </td>
+                ` : ''}
+                ${cols.includes('precio') ? `<td class="px-6 py-5 text-center">${precioTexto}</td>` : ''}
+                ${cols.includes('stock') ? `<td class="px-6 py-5 text-center">${stockCelda}</td>` : ''}
+                ${cols.includes('whatsapp') ? `
                 <td class="px-6 py-5 text-center">
                     <div class="flex justify-center">
                         ${renderSwitch(p.id, 'habilitar_whatsapp', p.habilitar_whatsapp, 'emerald', false, p.nombre)}
                     </div>
                 </td>
+                ` : ''}
+                ${cols.includes('precio_pub') ? `
                 <td class="px-6 py-5 text-center">
                     ${renderSwitch(p.id, 'mostrar_precio', p.mostrar_precio, 'blue', false, p.nombre)}
                 </td>
+                ` : ''}
+                ${cols.includes('acciones') ? `
                 <td class="px-6 py-4 text-center">
                     <div class="flex justify-center gap-2">
                         ${ActionButtons.render(p.id, 'edit', 'Editar', 'blue', 'productoController.mostrarFormularioEditar')}
-                        ${ActionButtons.render(p.id, 'visibility', 'Ver detalle', 'indigo', 'productoController.verDetalle')}
+                        ${ActionButtons.render(p.id, 'visibility', 'Ver', 'indigo', 'productoController.verDetalle')}
                         ${ActionButtons.render(dataEnc, 'delete', 'Eliminar', 'red', 'productoView.confirmarEliminacion')}
                     </div>
                 </td>
+                ` : ''}
             </tr>`;
         }).join('');
     },

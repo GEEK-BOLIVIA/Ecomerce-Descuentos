@@ -69,15 +69,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 0.2 INICIALIZACIÓN AUTOMÁTICA DE PRODUCTOS ---
     try {
-        // Cargamos la vista de productos por defecto al entrar
         await productoController.inicializar();
+        // Buscar el summary padre del div de productos y activarlo
+        const divProductos = document.querySelector('#main-sidebar details summary div[onclick*="productoController.inicializar"]');
+        const summaryProductos = divProductos?.closest('summary');
+        if (summaryProductos) actualizarEstadoActivo(summaryProductos);
     } catch (error) {
         console.error("Error al cargar productos iniciales:", error);
     }
-
     const mapeoRolesUsuarios = {
         'link-owners': 'owner',
         'link-admins': 'admin',
+        'link-supervisores': 'supervisor',
         'link-clientes': 'cliente'
     };
     // Modificamos la función cargarSeccion o el listener de clics
@@ -295,61 +298,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         contentArea.innerHTML = `<div class="flex items-center justify-center h-full text-slate-400">Error al cargar ${url}</div>`;
     }
 
-    /**
-  * Gestiona el resaltado visual de la opción seleccionada en el sidebar
-  */
-    /**
-  * Gestiona el resaltado visual de la opción seleccionada en el sidebar
-  */
     function actualizarEstadoActivo(elementoActivo) {
         if (!elementoActivo) return;
 
-        // 1. Limpiamos ABSOLUTAMENTE TODO de todos los posibles enlaces
-        // Seleccionamos nav-items, botones de submenú y summaries
-        const todosLosElementos = document.querySelectorAll('.nav-item, summary, [id^="link-"]');
+        // Subir al summary si el click viene de un div/span/p interno
+        const objetivo = elementoActivo.closest('summary') || elementoActivo;
 
-        todosLosElementos.forEach(item => {
-            // Quitamos fondos de todos los colores posibles
-            item.classList.remove(
+        // Limpiar todos los summaries y nav-items del sidebar
+        document.querySelectorAll('#main-sidebar summary, #main-sidebar .nav-item').forEach(el => {
+            el.classList.remove(
                 'bg-blue-50', 'text-blue-600',
                 'bg-indigo-50', 'text-indigo-600',
                 'bg-emerald-50', 'text-emerald-600',
                 'bg-slate-100'
             );
-            // Reset color base
-            item.classList.add('text-slate-500');
-
-            // Limpiamos los hijos (iconos y párrafos)
-            const hijos = item.querySelectorAll('span, p');
-            hijos.forEach(hijo => {
-                hijo.classList.remove('text-blue-600', 'text-indigo-600', 'text-emerald-600', 'font-bold');
+            el.classList.add('text-slate-500');
+            el.querySelectorAll('span.material-symbols-outlined, p').forEach(hijo => {
+                hijo.classList.remove(
+                    'text-blue-600', 'text-indigo-600',
+                    'text-emerald-600', 'font-bold'
+                );
             });
         });
 
-        // 2. Aplicamos el estilo activo al elemento clickeado
-        elementoActivo.classList.remove('text-slate-500');
+        const idTarget = objetivo.id || objetivo.querySelector('[id^="link-"]')?.id || '';
 
-        // Definimos el color según el contexto o ID
         let colorClass = 'text-blue-600';
         let bgClass = 'bg-blue-50';
 
-        if (elementoActivo.id === 'link-admins') {
+        if (idTarget === 'link-admins') {
             colorClass = 'text-indigo-600';
             bgClass = 'bg-indigo-50';
-        } else if (elementoActivo.id === 'link-clientes' || elementoActivo.id === 'link-subcategorias') {
+        } else if (idTarget === 'link-clientes' || idTarget === 'link-subcategorias') {
             colorClass = 'text-emerald-600';
             bgClass = 'bg-emerald-50';
         }
 
-        // Aplicar al contenedor principal
-        elementoActivo.classList.add(bgClass, colorClass);
+        objetivo.classList.remove('text-slate-500');
+        objetivo.classList.add(bgClass, colorClass);
 
-        // Aplicar a los elementos internos para que el icono también cambie de color
-        const textoActivo = elementoActivo.querySelector('p');
-        const iconoActivo = elementoActivo.querySelector('span');
-
-        if (textoActivo) textoActivo.classList.add('font-bold', colorClass);
-        if (iconoActivo) iconoActivo.classList.add(colorClass);
+        objetivo.querySelectorAll('span.material-symbols-outlined, p').forEach(hijo => {
+            hijo.classList.add(colorClass);
+        });
+        const p = objetivo.querySelector('p');
+        if (p) p.classList.add('font-bold');
     }
 });
 window.usuarioController = usuarioController;

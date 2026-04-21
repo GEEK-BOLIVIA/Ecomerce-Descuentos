@@ -4,8 +4,12 @@ import { configuracionColumnasView } from '../views/configuracionColumnasView.js
 
 export const configuracionColumnasController = {
 
+    // configuracionColumnasController.js - AGREGAR A ESQUEMAS
+
     ESQUEMAS: {
-        productos: ['nro', 'imagen', 'nombre_producto', 'categoria', 'precio', 'stock', 'whatsapp'],
+        productos: ['nro', 'imagen', 'nombre_producto', 'categoria', 'codigo', 'precio', 'stock', 'whatsapp', 'precio_pub', 'acciones'],
+        categorias_padre: ['nombre'],
+        subcategorias: ['nombre', 'categoria_padre']
     },
     // --- Agregar esto dentro de configuracionColumnasController ---
 
@@ -46,7 +50,7 @@ export const configuracionColumnasController = {
         let seleccionadas = null;
 
         try {
-            const { roles } = await usuariosModel.obtenerDestinosConfiguracion();
+            const { roles } = await usuarioModel.obtenerDestinosConfiguracion();
 
             while (paso > 0 && paso <= 4) {
 
@@ -61,7 +65,7 @@ export const configuracionColumnasController = {
                 // --- PASO 2: SELECCIONAR USUARIO ---
                 if (paso === 2) {
                     configuracionColumnasView.mostrarCargando('Buscando personal del grupo...');
-                    const todosLosUsuarios = await usuariosModel.obtenerTodos();
+                    const todosLosUsuarios = await usuarioModel.obtenerTodos();
                     const usuariosFiltrados = todosLosUsuarios.filter(u => u.rol === rolSeleccionado);
                     Swal.close();
 

@@ -123,7 +123,7 @@ export const usuarioView = {
                     <table class="w-full text-left border-collapse table-auto"> 
                         <thead>
                             <tr class="bg-slate-50/80 border-b border-slate-200">
-                                <th class="px-4 py-5 text-[11px] font-bold text-slate-400 uppercase w-12 text-center">#</th>
+                                <th class="px-4 py-5 text-[11px] font-bold text-slate-400 uppercase w-12 text-center">N°</th>
                                 <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-20 text-center">Perfil</th>
                                 <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Nombre Completo</th>
                                 <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">C.I.</th>

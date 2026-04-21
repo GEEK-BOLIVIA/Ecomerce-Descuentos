@@ -10,12 +10,12 @@ import { supabase } from '../config/supabaseClient.js';
 import { configuracionColumnasController } from '../controllers/configuracionColumnasController.js';
 import { detallesProductoView } from '../views/detallesProductoView.js';
 import { deleteProductoView } from '../views/deleteProductoView.js';
+import { usuarioModel } from '../models/usuarioModel.js';
 
 export const productoController = {
 
-    /**
-     * Sube archivos a Supabase Bucket
-     */
+    _columnasVisibles: [],
+
     async _uploadToSupabase(file, folder, nombreProducto = 'producto') {
         try {
             const slug = nombreProducto
@@ -79,6 +79,15 @@ export const productoController = {
     async inicializar() {
         productoView.mostrarCargando?.('Sincronizando inventario...');
         try {
+            const usuario = await usuarioModel.obtenerUsuarioActual();
+
+            this._columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
+                'productos',
+                ['nro', 'imagen', 'nombre_producto', 'categoria', 'precio', 'stock', 'whatsapp'],
+                usuario?.id,
+                usuario?.rol
+            );
+
             await this.refrescarVista();
             Swal.close();
         } catch (error) {
@@ -151,6 +160,15 @@ export const productoController = {
 
     async refrescarVista() {
         try {
+            const usuario = await usuarioModel.obtenerUsuarioActual();
+
+            const columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
+                'productos',
+                ['nro', 'imagen', 'nombre_producto', 'categoria', 'codigo', 'precio', 'stock', 'whatsapp', 'precio_pub', 'acciones'],
+                usuario?.id,
+                usuario?.rol
+            );
+
             const [sucursales, categorias] = await Promise.all([
                 sucursalModel.getAll(),
                 categoriasModel.obtenerTodas()
@@ -170,17 +188,13 @@ export const productoController = {
                 id: p.id || p.producto_id,
                 nombre: p.nombre || p.producto_nombre || 'Sin nombre',
                 nombre_categoria: p.nombre_categoria || p.categoria_nombre || 'General',
-                // Prioridad al campo codigo, fallback a sku o vacío
                 codigo: p.codigo || p.sku || ''
             }));
 
-            // Guardamos en memoria global para filtros rápidos si es necesario
             window.productosRaw = productosNormalizados;
 
-            // Renderizamos pasándole los datos ya limpios
-            productoView.render(productosNormalizados, categorias, sucursales);
+            productoView.render(productosNormalizados, categorias, sucursales, columnasVisibles);
 
-            // Cerramos cualquier alerta de carga o selección
             if (typeof Swal !== 'undefined') Swal.close();
 
         } catch (error) {

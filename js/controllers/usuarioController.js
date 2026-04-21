@@ -15,6 +15,7 @@ export const usuarioController = {
     _configuraciones: {
         'owner': { rol: 'owner', titulo: 'Owners', color: 'blue' },
         'admin': { rol: 'admin', titulo: 'Administradores', color: 'indigo' },
+        'supervisor': { rol: 'supervisor', titulo: 'Supervisores', color: 'violet' },
         'cliente': { rol: 'cliente', titulo: 'Clientes', color: 'emerald' }
     },
     _distribuirNombre(fullName) {

@@ -16,24 +16,35 @@ export const categoriasController = {
     _colsPadres: [],
     _colsHijos: [],
 
+    // categoriasController.js - REEMPLAZAR inicializar()
+
     async inicializar(pestanaPorDefecto = 'categorias') {
         try {
-            // Usamos la notificación de la vista para mantener consistencia visual
             categoriasView.mostrarCargando('Cargando catálogo...');
 
-            // 1. Cargar configuración de columnas
-            this._colsPadres = await configuracionColumnasController.obtenerColumnasVisibles(this.REF_PADRES, ['nombre']);
-            this._colsHijos = await configuracionColumnasController.obtenerColumnasVisibles(this.REF_HIJOS, ['nombre', 'categoria_padre']);
+            // OBTENER USUARIO
+            const usuario = await categoriasModel.obtenerUsuarioActual();
 
-            // 2. Cargar datos desde el modelo
+            // CARGAR COLUMNAS CON CONTEXTO
+            this._colsPadres = await configuracionColumnasController.obtenerColumnasVisibles(
+                this.REF_PADRES,
+                ['nombre'],
+                usuario?.id,
+                usuario?.rol
+            );
+
+            this._colsHijos = await configuracionColumnasController.obtenerColumnasVisibles(
+                this.REF_HIJOS,
+                ['nombre', 'categoria_padre'],
+                usuario?.id,
+                usuario?.rol
+            );
+
             const todas = await categoriasModel.obtenerTodas();
             this._datosPadres = todas.filter(c => !c.id_padre);
             this._datosHijos = todas.filter(c => c.id_padre);
 
-            // 3. Sincronizar la pestaña en el estado de la vista
             categoriasView._estado.pestanaActiva = pestanaPorDefecto;
-
-            // 4. Renderizar
             this.refrescarVista();
 
             Swal.close();
@@ -42,22 +53,21 @@ export const categoriasController = {
             categoriasView.notificarError('No se pudieron cargar los datos.');
         }
     },
-
     /**
      * REFRESCO DE VISTA
      */
     refrescarVista() {
         // Pasamos los datos completos; la vista hará el .slice() de la paginación internamente
         categoriasView.render(
-            this._datosPadres, 
-            this._colsPadres, 
-            this._datosHijos, 
+            this._datosPadres,
+            this._colsPadres,
+            this._datosHijos,
             this._colsHijos
         );
-        
+
         // Mantenemos tus configuraciones de eventos
         this._setupEventListeners();
-        this._setupTabLogic(); 
+        this._setupTabLogic();
     },
 
     async verDetalle(id) {
@@ -72,7 +82,7 @@ export const categoriasController = {
         if (res.exito) {
             categoriasView.notificarExito('Registro eliminado correctamente');
             // Recargamos manteniendo la pestaña actual del estado de la vista
-            this.inicializar(categoriasView._estado.pestanaActiva); 
+            this.inicializar(categoriasView._estado.pestanaActiva);
         } else {
             categoriasView.notificarError(res.mensaje);
         }
@@ -109,7 +119,7 @@ export const categoriasController = {
             titulo: 'Editar Registro',
             nombre: registro.nombre,
             id_padre: registro.id_padre,
-            categoriasPadre: padresDisponibles 
+            categoriasPadre: padresDisponibles
         });
 
         if (nuevosDatos) {
@@ -141,7 +151,7 @@ export const categoriasController = {
         const btnSub = document.getElementById('tab-subcategorias');
         const secCat = document.getElementById('seccion-categorias');
         const secSub = document.getElementById('seccion-subcategorias');
-        
+
         if (!btnCat || !btnSub) return;
 
         btnCat.onclick = () => {

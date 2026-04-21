@@ -188,7 +188,7 @@ export const productoView = {
     // ─────────────────────────────────────────────
     // RENDER PRINCIPAL (CORREGIDO)
     // ─────────────────────────────────────────────
-    render(productos, todasLasCategorias = [], sucursales = []) {
+    render(productos, todasLasCategorias = [], sucursales = [], columnasVisibles = []) {
         const contenedor = document.getElementById('content-area');
         if (!contenedor) return;
 
@@ -261,7 +261,7 @@ export const productoView = {
             renderEtiquetas
         )}
 
-            ${productoTabla.render(filtrados, this._estado, renderSwitch, renderPag, getColor)}
+            ${productoTabla.render(filtrados, this._estado, columnasVisibles, renderSwitch, renderPag, getColor)}
 
             ${this._renderBarraFlotante()}
 

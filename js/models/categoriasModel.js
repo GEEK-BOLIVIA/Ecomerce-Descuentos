@@ -186,5 +186,19 @@ export const categoriasModel = {
             console.error('Error buscando categorías:', err.message);
             return [];
         }
+    },
+    // categoriasModel.js - AGREGAR AL FINAL
+
+    async obtenerUsuarioActual() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+
+        const { data } = await supabase
+            .from('usuario')
+            .select('id, rol')
+            .eq('correo', user.email)
+            .single();
+
+        return data;
     }
 };

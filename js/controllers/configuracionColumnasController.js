@@ -9,7 +9,11 @@ export const configuracionColumnasController = {
     ESQUEMAS: {
         productos: ['nro', 'imagen', 'nombre_producto', 'categoria', 'codigo', 'precio', 'stock', 'whatsapp', 'precio_pub', 'acciones'],
         categorias_padre: ['nombre'],
-        subcategorias: ['nombre', 'categoria_padre']
+        subcategorias: ['nombre', 'categoria_padre'],
+        usuarios_owner: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
+        usuarios_admin: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
+        usuarios_supervisor: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
+        usuarios_cliente: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones']
     },
     // --- Agregar esto dentro de configuracionColumnasController ---
 

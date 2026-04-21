@@ -3,9 +3,10 @@ import { usuarioView } from '../views/usuarioView.js';
 import { detalleUsuarioModal } from '../views/components/detalleUsuarioModal.js';
 import { editarUsuarioModal } from '../views/components/editarUsuarioModal.js';
 import { eliminarUsuarioModal } from '../views/components/eliminarUsuarioModal.js';
+import { configuracionColumnasController } from './configuracionColumnasController.js';
 
 export const usuarioController = {
-
+    _columnasVisiblesPorRol: {},
     _estado: {
         rolActual: '',
         configActual: null
@@ -165,13 +166,7 @@ export const usuarioController = {
         if (!respuesta.exito) usuarioView.notificarError(respuesta.mensaje);
     },
 
-    // ==========================================
-    // SECCIÓN: MOTOR CRUD GLOBAL
-    // ==========================================
 
-    /**
-     * Inicializa la sección según el rol (Se llama desde navigation.js)
-     */
     async inicializarSeccion(rol) {
         try {
             if (document.activeElement) document.activeElement.blur();
@@ -184,24 +179,29 @@ export const usuarioController = {
 
             usuarioView.mostrarCargando(`Obteniendo listado de ${config.titulo}...`);
 
-            const datos = await usuarioModel.obtenerPorRol(rol);
+            const usuario = await usuarioModel.obtenerUsuarioActual();
+            const tablaRef = `usuarios_${rol.toLowerCase()}`;
 
-            // Renderizamos usando la vista global
-            usuarioView.render(datos, config);
+            this._columnasVisiblesPorRol[rol] = await configuracionColumnasController.obtenerColumnasVisibles(
+                tablaRef,
+                ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
+                usuario?.id,
+                usuario?.rol
+            );
 
+            await this.refrescarVista();
             Swal.close();
         } catch (error) {
             console.error(`Error al inicializar:`, error);
             usuarioView.notificarError("No se pudieron cargar los datos.");
         }
     },
-
-    /**
-     * Refresca la vista actual (útil para búsqueda, paginación o tras cambios)
-     */
+    
     async refrescarVista() {
         const datos = await usuarioModel.obtenerPorRol(this._estado.rolActual);
-        usuarioView.render(datos, this._estado.configActual);
+        const columnasVisibles = this._columnasVisiblesPorRol[this._estado.rolActual] ||
+            ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'];
+        usuarioView.render(datos, this._estado.configActual, columnasVisibles);
     },
 
     /**

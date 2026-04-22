@@ -1,29 +1,31 @@
 import { sucursalModel } from '../models/sucursalModel.js';
 import { sucursalView } from '../views/sucursalView.js';
+import { usuarioModel } from '../models/usuarioModel.js';
+import { configuracionColumnasController } from './configuracionColumnasController.js';
 
 export const sucursalController = {
+    _columnasVisibles: [],
     _datosCache: [],
 
-    /**
-     * Inicializa la interfaz de sucursales generando el HTML desde la View
-     */
     async inicializar(silencioso = false) {
         try {
-            // Solo mostramos cargando si NO es una búsqueda (silencioso)
-            if (!silencioso) {
-                sucursalView.mostrarCargando('Cargando sucursales...');
-            }
+            if (!silencioso) sucursalView.mostrarCargando('Cargando sucursales...');
+
+            const usuario = await usuarioModel.obtenerUsuarioActual();
+
+            this._columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
+                'sucursales',
+                ['nro', 'sucursal', 'direccion', 'productos', 'acciones'],
+                usuario?.id,
+                usuario?.rol
+            );
 
             const data = await sucursalModel.getAll();
             this._datosCache = data;
 
-            // Renderizamos la tabla
-            sucursalView.render(this._datosCache);
+            sucursalView.render(this._datosCache, this._columnasVisibles);
 
-            // Solo cerramos si nosotros mismos abrimos el modal
-            if (!silencioso) {
-                Swal.close();
-            }
+            if (!silencioso) Swal.close();
         } catch (error) {
             console.error("Error:", error);
             sucursalView.notificarError('Error al conectar con la base de datos');
@@ -162,8 +164,7 @@ export const sucursalController = {
         }
     },
     refrescarVista() {
-        // Usamos los datos guardados en la última carga
-        sucursalView.render(this._datosCache);
+        sucursalView.render(this._datosCache, this._columnasVisibles);
     },
 };
 

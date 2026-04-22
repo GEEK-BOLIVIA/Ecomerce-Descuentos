@@ -1,18 +1,29 @@
 import { departamentoModel } from '../models/departamentoModel.js';
 import { departamentoView } from '../views/departamentoView.js';
 import { departamentoFormView } from '../views/departamentoFormView.js';
+import { configuracionColumnasController } from './configuracionColumnasController.js';
+import { usuarioModel } from '../models/usuarioModel.js';
 
 export const departamentoController = {
     _datosCache: [],
+    _columnasVisibles: [],
 
     async inicializar(silencioso = false) {
         try {
-            if (!silencioso) {
-                departamentoView.mostrarCargando('Cargando departamentos...');
-            }
+            if (!silencioso) departamentoView.mostrarCargando('Cargando departamentos...');
+
+            const usuario = await usuarioModel.obtenerUsuarioActual();
+
+            this._columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
+                'departamentos',
+                ['nro', 'departamento', 'acciones'],
+                usuario?.id,
+                usuario?.rol
+            );
+
             const data = await departamentoModel.getAll();
             this._datosCache = data;
-            departamentoView.render(this._datosCache);
+            departamentoView.render(this._datosCache, this._columnasVisibles);
             if (!silencioso) Swal.close();
         } catch (error) {
             console.error('Error:', error);
@@ -132,8 +143,8 @@ export const departamentoController = {
     },
 
     refrescarVista() {
-        departamentoView.render(this._datosCache);
-    }
+        departamentoView.render(this._datosCache, this._columnasVisibles);
+    },
 };
 
 window.departamentoController = departamentoController;

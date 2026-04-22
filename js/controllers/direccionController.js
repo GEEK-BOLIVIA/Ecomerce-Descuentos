@@ -1,16 +1,29 @@
 import { direccionModel } from '../models/direccionModel.js';
 import { direccionView } from '../views/direccionView.js';
 import { direccionFormView } from '../views/direccionFormView.js';
+import { configuracionColumnasController } from './configuracionColumnasController.js';
+import { usuarioModel } from '../models/usuarioModel.js';
 
 export const direccionController = {
     _datosCache: [],
+    _columnasVisibles: [],
 
     async inicializar(silencioso = false) {
         try {
             if (!silencioso) direccionView.mostrarCargando('Cargando direcciones...');
+
+            const usuario = await usuarioModel.obtenerUsuarioActual();
+
+            this._columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
+                'direcciones',
+                ['nro', 'cliente', 'etiqueta', 'direccion', 'referencia', 'mapa', 'acciones'],
+                usuario?.id,
+                usuario?.rol
+            );
+
             const data = await direccionModel.getAll();
             this._datosCache = data;
-            direccionView.render(this._datosCache);
+            direccionView.render(this._datosCache, this._columnasVisibles);
             if (!silencioso) Swal.close();
         } catch (error) {
             console.error('Error:', error);
@@ -191,8 +204,8 @@ export const direccionController = {
         }
     },
     refrescarVista() {
-        direccionView.render(this._datosCache);
-    }
+        direccionView.render(this._datosCache, this._columnasVisibles);
+    },
 };
 
 window.direccionController = direccionController;

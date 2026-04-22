@@ -99,160 +99,162 @@ export const direccionView = {
     // ─────────────────────────────────────────────
     // RENDER TABLA
     // ─────────────────────────────────────────────
-    render(datos) {
+    render(datos, columnasVisibles = []) {
         const contenedor = document.getElementById('content-area');
         if (!contenedor) return;
+
+        const cols = columnasVisibles.length > 0 ? columnasVisibles :
+            ['nro', 'cliente', 'etiqueta', 'direccion', 'referencia', 'mapa', 'acciones'];
 
         let datosFiltrados = this._ordenarDatos(this._filtrarDatos(datos));
         const inicio = (this._estado.paginaActual - 1) * this._estado.filasPorPagina;
         const datosPaginados = datosFiltrados.slice(inicio, inicio + this._estado.filasPorPagina);
 
         contenedor.innerHTML = `
-        <div class="p-8 animate-fade-in max-h-[calc(100vh-64px)] overflow-y-auto">
+    <div class="p-8 animate-fade-in max-h-[calc(100vh-64px)] overflow-y-auto">
 
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                <div>
-                    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Gestión de Direcciones</h1>
-                    <p class="text-slate-500 text-sm font-medium">Direcciones registradas por los clientes con ubicación en el mapa.</p>
-                </div>
-                <button onclick="direccionController.mostrarFormularioCrear()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl transition-all
-                               shadow-lg shadow-blue-200 font-bold text-sm flex items-center gap-2 w-fit">
-                    <span class="material-symbols-outlined text-[20px]">add_location_alt</span> Nueva Dirección
-                </button>
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Gestión de Direcciones</h1>
+                <p class="text-slate-500 text-sm font-medium">Direcciones registradas por los clientes con ubicación en el mapa.</p>
+            </div>
+            <button onclick="direccionController.mostrarFormularioCrear()"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl transition-all
+                           shadow-lg shadow-blue-200 font-bold text-sm flex items-center gap-2 w-fit">
+                <span class="material-symbols-outlined text-[20px]">add_location_alt</span> Nueva Dirección
+            </button>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div class="relative flex-1 md:w-96">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+                <input type="text" id="input-busqueda-direcciones"
+                       placeholder="Buscar por cliente, etiqueta o referencia..."
+                       value="${this._estado.busqueda}"
+                       oninput="direccionView.gestionarBusqueda(this.value)"
+                       class="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-10 text-sm
+                              outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500
+                              transition-all font-medium">
+                ${this._estado.busqueda ? `
+                <button onclick="direccionView.limpiarBusqueda()"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center
+                               rounded-full bg-slate-200 hover:bg-slate-300 text-slate-500 transition-all">
+                    <span class="material-symbols-outlined text-[13px]">close</span>
+                </button>` : ''}
             </div>
 
-            <!-- Buscador -->
-            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                <div class="relative flex-1 md:w-96">
-                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-                    <input type="text" id="input-busqueda-direcciones"
-                           placeholder="Buscar por cliente, etiqueta o referencia..."
-                           value="${this._estado.busqueda}"
-                           oninput="direccionView.gestionarBusqueda(this.value)"
-                           class="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-10 text-sm
-                                  outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500
-                                  transition-all font-medium">
-                    ${this._estado.busqueda ? `
-                    <button onclick="direccionView.limpiarBusqueda()"
-                            class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center
-                                   rounded-full bg-slate-200 hover:bg-slate-300 text-slate-500 transition-all">
-                        <span class="material-symbols-outlined text-[13px]">close</span>
-                    </button>` : ''}
-                </div>
+            <div class="flex items-center gap-2">
                 <button onclick="direccionView.gestionarOrden()"
                         class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl
                                text-slate-600 hover:text-blue-600 transition-all shadow-sm font-bold text-sm">
                     <span class="material-symbols-outlined text-lg">${this._estado.orden === 'asc' ? 'sort_by_alpha' : 'text_rotate_vertical'}</span>
                     ${this._estado.orden === 'asc' ? 'A-Z' : 'Z-A'}
                 </button>
-            </div>
 
-            <!-- Tabla -->
-            <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden mb-8">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse table-auto">
-                        <thead>
-                            <tr class="bg-slate-50/80 border-b border-slate-200">
-                                <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-12 text-center">N°</th>
-                                <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Cliente</th>
-                                <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Etiqueta</th>
-                                <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Dirección</th>
-                                <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Referencia</th>
-                                <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Mapa</th>
-                                <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            ${datosPaginados.length > 0
-                ? datosPaginados.map((d, i) => this._crearFila(d, inicio + i + 1)).join('')
+                <button onclick="configuracionColumnasController.iniciarFlujoConfiguracion('direcciones', (cols) => { direccionController._columnasVisibles = cols; direccionController.refrescarVista(); })"
+                        class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-blue-600 transition-all shadow-sm font-bold text-sm">
+                    <span class="material-symbols-outlined text-lg">view_column</span>
+                    Columnas
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden mb-8">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse table-auto">
+                    <thead>
+                        <tr class="bg-slate-50/80 border-b border-slate-200">
+                            ${cols.includes('nro') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-12 text-center">N°</th>` : ''}
+                            ${cols.includes('cliente') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Cliente</th>` : ''}
+                            ${cols.includes('etiqueta') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Etiqueta</th>` : ''}
+                            ${cols.includes('direccion') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Dirección</th>` : ''}
+                            ${cols.includes('referencia') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Referencia</th>` : ''}
+                            ${cols.includes('mapa') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Mapa</th>` : ''}
+                            ${cols.includes('acciones') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Acciones</th>` : ''}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${datosPaginados.length > 0
+                ? datosPaginados.map((d, i) => this._crearFila(d, inicio + i + 1, cols)).join('')
                 : `<tr><td colspan="7" class="px-6 py-12 text-center text-slate-400 italic text-sm">No se encontraron direcciones registradas</td></tr>`
             }
-                        </tbody>
-                    </table>
-                </div>
-                ${PaginationHelper.render(datosFiltrados.length, this._estado.filasPorPagina, this._estado.paginaActual, 'direccionView')}
+                    </tbody>
+                </table>
             </div>
-        </div>`;
+            ${PaginationHelper.render(datosFiltrados.length, this._estado.filasPorPagina, this._estado.paginaActual, 'direccionView')}
+        </div>
+    </div>`;
 
         this._enfocarBusqueda();
     },
 
-    _crearFila(d, numero) {
+    _crearFila(d, numero, cols = []) {
         const nombre = this._nombreCompleto(d.usuario);
         const iniciales = this._iniciales(d.usuario);
         const esPpal = d.es_principal;
 
         return `
-        <tr class="hover:bg-slate-50/50 transition-colors group">
-            <td class="px-6 py-4 text-center">
-                <span class="text-slate-400 font-bold text-xs">${numero}</span>
-            </td>
-
-            <!-- Cliente -->
-            <td class="px-6 py-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center
-                                font-black text-[11px] flex-shrink-0">
-                        ${iniciales}
-                    </div>
-                    <div>
-                        <p class="text-[12px] font-black text-slate-700 uppercase leading-tight">${nombre}</p>
-                        <p class="text-[10px] text-slate-400 truncate max-w-[160px]">${d.usuario?.correo_electronico || ''}</p>
-                    </div>
+    <tr class="hover:bg-slate-50/50 transition-colors group">
+        ${cols.includes('nro') ? `
+        <td class="px-6 py-4 text-center">
+            <span class="text-slate-400 font-bold text-xs">${numero}</span>
+        </td>` : ''}
+        ${cols.includes('cliente') ? `
+        <td class="px-6 py-4">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center
+                            font-black text-[11px] flex-shrink-0">${iniciales}</div>
+                <div>
+                    <p class="text-[12px] font-black text-slate-700 uppercase leading-tight">${nombre}</p>
+                    <p class="text-[10px] text-slate-400 truncate max-w-[160px]">${d.usuario?.correo_electronico || ''}</p>
                 </div>
-            </td>
-
-            <!-- Etiqueta -->
-            <td class="px-6 py-4 text-center">
-                <div class="flex flex-col items-center gap-1">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase
-                                 bg-blue-50 border border-blue-100 text-blue-700">
-                        <span class="material-symbols-outlined text-[12px]">label</span>
-                        ${d.nombre_lugar || 'Mi Casa'}
-                    </span>
-                    ${esPpal ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase
-                                              bg-amber-50 border border-amber-100 text-amber-600">
-                                    <span class="material-symbols-outlined text-[10px]">star</span> Principal
-                                </span>` : ''}
-                </div>
-            </td>
-
-            <!-- Dirección texto -->
-            <td class="px-6 py-4">
-                <p class="text-[11px] text-slate-600 font-medium truncate max-w-[200px]" title="${d.direccion_texto || ''}">
-                    ${d.direccion_texto || `<span class="text-slate-300 italic">Sin dirección detectada</span>`}
-                </p>
-                <p class="text-[10px] text-slate-400 mt-0.5">${d.departamento?.nombre || '—'}</p>
-            </td>
-
-            <!-- Referencia -->
-            <td class="px-6 py-4">
-                <p class="text-[11px] text-slate-600 font-medium truncate max-w-[160px]" title="${d.referencia}">
-                    ${d.referencia}
-                </p>
-            </td>
-
-            <!-- Mapa -->
-            <td class="px-6 py-4 text-center">
-                <button onclick="direccionController.verMapa(${d.id})"
-                        class="w-9 h-9 flex items-center justify-center mx-auto rounded-xl
-                               bg-emerald-50 hover:bg-emerald-100 text-emerald-600
-                               border border-emerald-100 transition-all"
-                        title="Ver en mapa">
-                    <span class="material-symbols-outlined text-[18px]">location_on</span>
-                </button>
-            </td>
-
-            <!-- Acciones -->
-            <td class="px-6 py-4 text-center">
-                <div class="flex justify-center gap-2">
-                    ${ActionButtons.render(d.id, 'edit', 'Editar', 'blue', 'direccionController.editar')}
-                    ${ActionButtons.render(d.id, 'visibility', 'Ver Detalle', 'indigo', 'direccionController.verDetalle')}
-                    ${ActionButtons.render(d.id, 'delete', 'Eliminar', 'red', 'direccionController.confirmarEliminacion')}
-                </div>
-            </td>
-        </tr>`;
+            </div>
+        </td>` : ''}
+        ${cols.includes('etiqueta') ? `
+        <td class="px-6 py-4 text-center">
+            <div class="flex flex-col items-center gap-1">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase
+                             bg-blue-50 border border-blue-100 text-blue-700">
+                    <span class="material-symbols-outlined text-[12px]">label</span>
+                    ${d.nombre_lugar || 'Mi Casa'}
+                </span>
+                ${esPpal ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase
+                                          bg-amber-50 border border-amber-100 text-amber-600">
+                                <span class="material-symbols-outlined text-[10px]">star</span> Principal
+                            </span>` : ''}
+            </div>
+        </td>` : ''}
+        ${cols.includes('direccion') ? `
+        <td class="px-6 py-4">
+            <p class="text-[11px] text-slate-600 font-medium truncate max-w-[200px]" title="${d.direccion_texto || ''}">
+                ${d.direccion_texto || `<span class="text-slate-300 italic">Sin dirección detectada</span>`}
+            </p>
+            <p class="text-[10px] text-slate-400 mt-0.5">${d.departamento?.nombre || '—'}</p>
+        </td>` : ''}
+        ${cols.includes('referencia') ? `
+        <td class="px-6 py-4">
+            <p class="text-[11px] text-slate-600 font-medium truncate max-w-[160px]" title="${d.referencia}">
+                ${d.referencia}
+            </p>
+        </td>` : ''}
+        ${cols.includes('mapa') ? `
+        <td class="px-6 py-4 text-center">
+            <button onclick="direccionController.verMapa(${d.id})"
+                    class="w-9 h-9 flex items-center justify-center mx-auto rounded-xl
+                           bg-emerald-50 hover:bg-emerald-100 text-emerald-600
+                           border border-emerald-100 transition-all" title="Ver en mapa">
+                <span class="material-symbols-outlined text-[18px]">location_on</span>
+            </button>
+        </td>` : ''}
+        ${cols.includes('acciones') ? `
+        <td class="px-6 py-4 text-center">
+            <div class="flex justify-center gap-2">
+                ${ActionButtons.render(d.id, 'edit', 'Editar', 'blue', 'direccionController.editar')}
+                ${ActionButtons.render(d.id, 'visibility', 'Ver Detalle', 'indigo', 'direccionController.verDetalle')}
+                ${ActionButtons.render(d.id, 'delete', 'Eliminar', 'red', 'direccionController.confirmarEliminacion')}
+            </div>
+        </td>` : ''}
+    </tr>`;
     },
 
     // ─────────────────────────────────────────────

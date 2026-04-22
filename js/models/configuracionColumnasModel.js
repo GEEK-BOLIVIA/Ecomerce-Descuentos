@@ -8,28 +8,32 @@ export const configuracionColumnasModel = {
      */
     async obtenerConfiguracion(tablaNombre, usuarioId = null, rolId = null) {
         try {
-            let query = supabase
-                .from('configuracion_columnas')
-                .select('columnas_visibles')
-                .eq('tabla_nombre', tablaNombre);
-
+            // Prioridad 1: config específica del usuario
             if (usuarioId) {
-                // Prioridad 1: Configuración específica del usuario
-                query = query.eq('usuario_id', usuarioId).is('rol_id', null);
-            } else if (rolId) {
-                // Prioridad 2: Configuración del grupo (rol)
-                query = query.eq('rol_id', rolId).is('usuario_id', null);
+                const { data: dataUsuario } = await supabase
+                    .from('configuracion_columnas')
+                    .select('columnas_visibles')
+                    .eq('tabla_nombre', tablaNombre)
+                    .eq('usuario_id', usuarioId)
+                    .is('rol_id', null);
+
+                if (dataUsuario && dataUsuario.length > 0) {
+                    return dataUsuario[0].columnas_visibles;
+                }
             }
 
-            // Usamos .select() normal en lugar de .maybeSingle() para evitar el error 406/400
-            const { data, error } = await query;
-            if (data && data.length > 0) return data[0].columnas_visibles;
+            // Prioridad 2: config del rol
+            if (rolId) {
+                const { data: dataRol } = await supabase
+                    .from('configuracion_columnas')
+                    .select('columnas_visibles')
+                    .eq('tabla_nombre', tablaNombre)
+                    .eq('rol_id', rolId)
+                    .is('usuario_id', null);
 
-            if (error) throw error;
-
-            // Si hay resultados, tomamos el primero (el más reciente o único)
-            if (data && data.length > 0) {
-                return data[0].columnas_visibles;
+                if (dataRol && dataRol.length > 0) {
+                    return dataRol[0].columnas_visibles;
+                }
             }
 
             return null;
@@ -38,7 +42,6 @@ export const configuracionColumnasModel = {
             return null;
         }
     },
-
     /**
      * Guarda o actualiza la configuración (UPSERT).
      * CORRECCIÓN: Se envía como [array] para satisfacer los requisitos de la API.

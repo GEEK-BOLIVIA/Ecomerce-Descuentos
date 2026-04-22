@@ -13,7 +13,10 @@ export const configuracionColumnasController = {
         usuarios_owner: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
         usuarios_admin: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
         usuarios_supervisor: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
-        usuarios_cliente: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones']
+        usuarios_cliente: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
+        sucursales: ['nro', 'sucursal', 'direccion', 'productos', 'acciones'],
+        departamentos: ['nro', 'departamento', 'acciones'],
+        direcciones: ['nro', 'cliente', 'etiqueta', 'direccion', 'referencia', 'mapa', 'acciones'],
     },
     // --- Agregar esto dentro de configuracionColumnasController ---
 

@@ -191,16 +191,16 @@ export const sucursalView = {
     /**
      * RENDER PRINCIPAL
      */
-    render(datos) {
+    render(datos, columnasVisibles = []) {
         const contenedor = document.getElementById('content-area');
         if (!contenedor) return;
 
-        // Filtramos y ordenamos antes de paginar
-        let datosFiltrados = this._ordenarDatos(this._filtrarDatos(datos));
+        const cols = columnasVisibles.length > 0 ? columnasVisibles :
+            ['nro', 'sucursal', 'direccion', 'productos', 'acciones'];
 
+        let datosFiltrados = this._ordenarDatos(this._filtrarDatos(datos));
         const inicio = (this._estado.paginaActual - 1) * this._estado.filasPorPagina;
-        const fin = inicio + this._estado.filasPorPagina;
-        const datosPaginados = datosFiltrados.slice(inicio, fin);
+        const datosPaginados = datosFiltrados.slice(inicio, inicio + this._estado.filasPorPagina);
 
         const html = `
     <div class="p-8 animate-fade-in max-h-[calc(100vh-64px)] overflow-y-auto">
@@ -209,7 +209,6 @@ export const sucursalView = {
                 <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Gestión de Sucursales</h1>
                 <p class="text-slate-500 text-sm font-medium">Administración de sedes físicas, inventarios y puntos de venta.</p>
             </div>
-            
             <div class="flex flex-wrap gap-3">
                 <button onclick="sucursalController.mostrarFormularioCrear()" 
                         class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl transition-all shadow-lg shadow-indigo-200 font-bold text-sm flex items-center gap-2 w-fit">
@@ -229,11 +228,19 @@ export const sucursalView = {
                        class="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium">
             </div>
             
-            <button onclick="sucursalView.gestionarOrden()" 
-                    class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 transition-all shadow-sm font-bold text-sm">
-                <span class="material-symbols-outlined text-lg">${this._estado.orden === 'asc' ? 'sort_by_alpha' : 'text_rotate_vertical'}</span>
-                ${this._estado.orden === 'asc' ? 'A-Z' : 'Z-A'}
-            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="sucursalView.gestionarOrden()" 
+                        class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 transition-all shadow-sm font-bold text-sm">
+                    <span class="material-symbols-outlined text-lg">${this._estado.orden === 'asc' ? 'sort_by_alpha' : 'text_rotate_vertical'}</span>
+                    ${this._estado.orden === 'asc' ? 'A-Z' : 'Z-A'}
+                </button>
+
+                <button onclick="configuracionColumnasController.iniciarFlujoConfiguracion('sucursales', (cols) => { sucursalController._columnasVisibles = cols; sucursalController.refrescarVista(); })"
+                        class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 transition-all shadow-sm font-bold text-sm">
+                    <span class="material-symbols-outlined text-lg">view_column</span>
+                    Columnas
+                </button>
+            </div>
         </div>
 
         <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden mb-8">
@@ -241,22 +248,21 @@ export const sucursalView = {
                 <table class="w-full text-left border-collapse table-auto"> 
                     <thead>
                         <tr class="bg-slate-50/80 border-b border-slate-200">
-                            <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-16 text-center">N°</th>
-                            <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Sucursal</th>
-                            <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Dirección</th>
-                            <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Productos</th>
-                            <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Acciones</th>
+                            ${cols.includes('nro') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-16 text-center">N°</th>` : ''}
+                            ${cols.includes('sucursal') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Sucursal</th>` : ''}
+                            ${cols.includes('direccion') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Dirección</th>` : ''}
+                            ${cols.includes('productos') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Productos</th>` : ''}
+                            ${cols.includes('acciones') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Acciones</th>` : ''}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         ${datosPaginados.length > 0
-                ? datosPaginados.map((s, index) => this._crearFila(s, inicio + index + 1)).join('')
+                ? datosPaginados.map((s, index) => this._crearFila(s, inicio + index + 1, cols)).join('')
                 : `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400 italic text-sm">No se encontraron sucursales registradas</td></tr>`
             }
                     </tbody>
                 </table>
             </div>
-
             ${PaginationHelper.render(datosFiltrados.length, this._estado.filasPorPagina, this._estado.paginaActual, 'sucursalView')}
         </div>
     </div>
@@ -266,47 +272,41 @@ export const sucursalView = {
         this._enfocarBusqueda();
     },
 
-    _crearFila(s, numero) {
-        const colorIcono = 'indigo';
-
+    _crearFila(s, numero, cols = []) {
         return `
     <tr class="hover:bg-slate-50/50 transition-colors group">
+        ${cols.includes('nro') ? `
         <td class="px-6 py-5 text-center">
             <span class="text-slate-400 font-bold text-xs">${numero}</span>
-        </td>
-
+        </td>` : ''}
+        ${cols.includes('sucursal') ? `
         <td class="px-6 py-5">
             <div class="flex items-center justify-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-${colorIcono}-50 text-${colorIcono}-600 flex items-center justify-center shadow-sm border border-${colorIcono}-100/50 flex-shrink-0">
+                <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm border border-indigo-100/50 flex-shrink-0">
                     <span class="material-symbols-outlined" style="font-variation-settings: 'wght' 200; font-size: 18px;">storefront</span>
                 </div>
-                <span class="text-slate-800 font-bold uppercase text-[13px] tracking-wide truncate">
-                    ${s.nombre}
-                </span>
+                <span class="text-slate-800 font-bold uppercase text-[13px] tracking-wide truncate">${s.nombre}</span>
             </div>
-        </td>
-
+        </td>` : ''}
+        ${cols.includes('direccion') ? `
         <td class="px-6 py-5 text-center">
             <div class="flex items-center justify-center gap-1.5 text-slate-500">
                 <span class="material-symbols-outlined text-[16px] text-slate-400" style="font-variation-settings: 'wght' 200;">location_on</span>
-                <span class="text-xs font-medium truncate max-w-[250px]">
-                    ${s.direccion || 'Sin dirección registrada'}
-                </span>
+                <span class="text-xs font-medium truncate max-w-[250px]">${s.direccion || 'Sin dirección registrada'}</span>
             </div>
-        </td>
-
+        </td>` : ''}
+        ${cols.includes('productos') ? `
         <td class="px-6 py-5 text-center">
             ${TableWidgets.badge(s.total_productos || 0, 'Items')}
-        </td>
-
-      
+        </td>` : ''}
+        ${cols.includes('acciones') ? `
         <td class="px-6 py-5 text-center">
             <div class="flex justify-center gap-2">
                 ${ActionButtons.render(s.id, 'edit', 'Editar', 'blue', 'sucursalController.editar')}
                 ${ActionButtons.render(s.id, 'visibility', 'Ver Detalle', 'indigo', 'sucursalController.verDetalle')}
                 ${ActionButtons.render(s.id, 'delete', 'Eliminar', 'red', 'sucursalController.confirmarEliminacion')}
             </div>
-        </td>
+        </td>` : ''}
     </tr>`;
     },
     /**

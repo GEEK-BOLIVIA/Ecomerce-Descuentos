@@ -115,7 +115,7 @@ export const usuarioView = {
                     ${this._estado.orden === 'asc' ? 'A-Z' : 'Z-A'}
                 </button>
 
-                <button onclick="configuracionColumnasController.iniciarFlujoConfiguracion('usuarios_${infoConfig.rol.toLowerCase()}', (cols) => { usuarioController._columnasVisiblesPorRol['${infoConfig.rol}'] = cols; usuarioController.refrescarVista(); })"
+                <button onclick="configuracionColumnasController.iniciarFlujoConfiguracion('usuarios_${infoConfig.rol.toLowerCase()}', async () => { await usuarioController.inicializarSeccion('${infoConfig.rol}'); })"
                         class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 transition-all shadow-sm font-bold text-sm">
                     <span class="material-symbols-outlined text-lg">view_column</span>
                     Columnas

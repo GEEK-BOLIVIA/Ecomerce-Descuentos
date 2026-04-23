@@ -1,27 +1,38 @@
 import { comboModel } from '../models/comboModel.js';
 import { comboView } from '../views/comboView.js';
 import { comboFormView } from '../views/comboFormView.js';
+import { configuracionColumnasController } from './configuracionColumnasController.js';
+import { usuarioModel } from '../models/usuarioModel.js';
 
 export const comboController = {
 
     _datosCache: [],
+    _columnasVisibles: [],
 
-    // ─────────────────────────────────────────────
-    // INICIALIZAR
-    // ─────────────────────────────────────────────
     async inicializar(silencioso = false) {
         if (!silencioso) comboView.mostrarCargando('Cargando combos...');
         try {
+            const usuario = await usuarioModel.obtenerUsuarioActual();
+
+            this._columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
+                'combos',
+                ['nro', 'nombre', 'precio_descuento', 'alcance', 'vigencia', 'estado', 'acciones'],
+                usuario?.id,
+                usuario?.rol
+            );
+
             this._datosCache = await comboModel.getAll();
             Swal.close();
-            comboView.mostrarTabla(this._datosCache);
+            comboView.mostrarTabla(this._datosCache, this._columnasVisibles);
         } catch (error) {
             console.error(error);
             Swal.close();
             comboView.notificarError('Error al cargar los combos.');
         }
     },
-
+    refrescarVista() {
+        comboView.mostrarTabla(this._datosCache, this._columnasVisibles);
+    },
     // ─────────────────────────────────────────────
     // CREAR
     // ─────────────────────────────────────────────

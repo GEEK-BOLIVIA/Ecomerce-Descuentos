@@ -151,7 +151,7 @@ export const direccionView = {
                     ${this._estado.orden === 'asc' ? 'A-Z' : 'Z-A'}
                 </button>
 
-                <button onclick="configuracionColumnasController.iniciarFlujoConfiguracion('direcciones', (cols) => { direccionController._columnasVisibles = cols; direccionController.refrescarVista(); })"
+                <button onclick="configuracionColumnasController.iniciarFlujoConfiguracion('direcciones', async () => { await direccionController.inicializar(true); })"
                         class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-blue-600 transition-all shadow-sm font-bold text-sm">
                     <span class="material-symbols-outlined text-lg">view_column</span>
                     Columnas

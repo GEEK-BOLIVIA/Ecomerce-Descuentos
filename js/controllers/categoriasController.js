@@ -189,8 +189,8 @@ export const categoriasController = {
         // Filtrar las columnas para el selector: No mostramos 'id' ni 'visible'
         const columnasParaMostrarAlOwner = columnasTotales.filter(col => !this.COLUMNAS_TECNICAS.includes(col));
 
-        await configuracionColumnasController.abrirSelectorColumnas(tablaRef, columnasParaMostrarAlOwner, () => {
-            this.inicializar(categoriasView._estado.pestanaActiva);
+        await configuracionColumnasController.abrirSelectorColumnas(tablaRef, columnasParaMostrarAlOwner, async () => {
+            await this.inicializar(categoriasView._estado.pestanaActiva);
         });
     }
 };

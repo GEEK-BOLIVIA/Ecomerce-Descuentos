@@ -78,11 +78,13 @@ export const carruselController_View = {
         return false;
     },
 
-    async render() {
+    async render(columnasVisibles = []) {
         const contenedor = document.getElementById('content-area');
         if (!contenedor) return;
 
-        // 1. MOSTRAR LOADING INICIAL AL ABRIR LA VISTA
+        const cols = columnasVisibles.length > 0 ? columnasVisibles :
+            ['nro', 'nombre', 'ubicacion', 'tipo', 'acciones'];
+
         Swal.fire({
             title: 'Cargando registros',
             html: 'Sincronizando con la base de datos...',
@@ -94,118 +96,120 @@ export const carruselController_View = {
         try {
             let datos = await carruselController.cargarCarruseles();
             let datosFiltrados = this._ordenarDatos(this._filtrarDatos(datos));
-
             const inicio = (this._estado.paginaActual - 1) * this._estado.filasPorPagina;
-            const fin = inicio + this._estado.filasPorPagina;
-            const datosPaginados = datosFiltrados.slice(inicio, fin);
+            const datosPaginados = datosFiltrados.slice(inicio, inicio + this._estado.filasPorPagina);
 
-            // CERRAR LOADING
             Swal.close();
 
             contenedor.innerHTML = `
-                <div class="p-8 animate-fade-in max-h-[calc(100vh-64px)] overflow-y-auto">
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                        <div>
-                            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Carruseles y Banners</h1>
-                            <p class="text-slate-500 text-sm">Gestiona la publicidad y colecciones de la página principal.</p>
-                        </div>
-                    </div>
+        <div class="p-8 animate-fade-in max-h-[calc(100vh-64px)] overflow-y-auto">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Carruseles y Banners</h1>
+                    <p class="text-slate-500 text-sm">Gestiona la publicidad y colecciones de la página principal.</p>
+                </div>
+            </div>
 
-                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                        <div class="flex items-center gap-3 w-full md:w-auto">
-                            <div class="relative flex-1 md:w-64">
-                                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-                                <input type="text" 
-                                       placeholder="Buscar carrusel..." 
-                                       value="${this._estado.busqueda}"
-                                       oninput="carruselController_View.gestionarBusqueda(this.value)"
-                                       class="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium">
-                            </div>
-                            <button onclick="carruselController_View.gestionarOrden()" 
-                                    class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-blue-600 transition-all shadow-sm font-bold text-sm">
-                                <span class="material-symbols-outlined text-lg">${this._estado.orden === 'asc' ? 'sort_by_alpha' : 'text_rotate_vertical'}</span>
-                                ${this._estado.orden === 'asc' ? 'A-Z' : 'Z-A'}
-                            </button>
-                        </div>
-                        <button onclick="RegisterCarrusel.init('content-area')" 
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl transition-all shadow-md font-bold text-sm flex items-center gap-2">
-                            <span class="material-symbols-outlined text-[20px]">add</span> Nuevo Carrusel
-                        </button>
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                    <div class="relative flex-1 md:w-64">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+                        <input type="text" 
+                               placeholder="Buscar carrusel..." 
+                               value="${this._estado.busqueda}"
+                               oninput="carruselController_View.gestionarBusqueda(this.value)"
+                               class="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium">
                     </div>
+                    <button onclick="carruselController_View.gestionarOrden()" 
+                            class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-blue-600 transition-all shadow-sm font-bold text-sm">
+                        <span class="material-symbols-outlined text-lg">${this._estado.orden === 'asc' ? 'sort_by_alpha' : 'text_rotate_vertical'}</span>
+                        ${this._estado.orden === 'asc' ? 'A-Z' : 'Z-A'}
+                    </button>
+                    <button onclick="configuracionColumnasController.iniciarFlujoConfiguracion('carruseles', async () => { await carruselController.inicializar(); })"
+                            class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-blue-600 transition-all shadow-sm font-bold text-sm">
+                        <span class="material-symbols-outlined text-lg">view_column</span>
+                        Columnas
+                    </button>
+                </div>
+                <button onclick="RegisterCarrusel.init('content-area')" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl transition-all shadow-md font-bold text-sm flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">add</span> Nuevo Carrusel
+                </button>
+            </div>
 
-                    <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden mb-8">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse table-auto">
-                                <thead>
-                                    <tr class="bg-slate-50/80 border-b border-slate-200">
-                                        <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-24 text-center">N°</th>
-                                        <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center min-w-[200px]">Nombre / Descripción</th>
-                                        <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center min-w-[150px]">Ubicación</th>
-                                        <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center min-w-[120px]">Tipo</th>
-                                        <th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center w-64">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    ${datosPaginados.length > 0
-                    ? datosPaginados.map((item, index) => this._crearFila(item, inicio + index)).join('')
+            <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden mb-8">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse table-auto">
+                        <thead>
+                            <tr class="bg-slate-50/80 border-b border-slate-200">
+                                ${cols.includes('nro') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-24 text-center">N°</th>` : ''}
+                                ${cols.includes('nombre') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center min-w-[200px]">Nombre / Descripción</th>` : ''}
+                                ${cols.includes('ubicacion') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center min-w-[150px]">Ubicación</th>` : ''}
+                                ${cols.includes('tipo') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center min-w-[120px]">Tipo</th>` : ''}
+                                ${cols.includes('acciones') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center w-64">Acciones</th>` : ''}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            ${datosPaginados.length > 0
+                    ? datosPaginados.map((item, index) => this._crearFila(item, inicio + index, cols)).join('')
                     : `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400 italic text-sm">No se encontraron carruseles</td></tr>`
                 }
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
-            `;
+            </div>
+        </div>`;
         } catch (error) {
             Swal.close();
             this.notificarError("Error al conectar con el servidor.");
         }
     },
 
-    _crearFila(item, index) {
+    _crearFila(item, index, cols = []) {
         return `
-            <tr class="hover:bg-blue-50/40 transition-colors group">
-                <td class="px-6 py-4 text-sm text-slate-400 font-bold text-center border-r border-slate-50/50">
-                    ${index + 1}
-                </td>
-                <td class="px-6 py-4 text-center">
-                    <div class="flex flex-col items-center">
-                        <span class="text-slate-800 font-bold uppercase text-[13px] tracking-wide">${item.nombre}</span>
-                        <span class="text-[10px] text-slate-400 font-medium">${item.descripcion || 'SIN DESCRIPCIÓN'}</span>
-                    </div>
-                </td>
-                <td class="px-6 py-4 text-center">
-                    <span class="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black border border-slate-200 uppercase shadow-sm">
-                        ${item.ubicacion_slug}
-                    </span>
-                </td>
-                <td class="px-6 py-4 text-center text-sm text-slate-600 font-semibold uppercase">
-                    ${item.tipo}
-                </td>
-                <td class="px-6 py-4">
-                    <div class="flex items-center justify-center gap-2">
-                        
-                        <button onclick="carruselController.abrirEditor('${item.id}')" 
-                                title="Editar" 
-                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                            <span class="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
-
-                        <button onclick="carruselController_View.verDetalles('${item.id}', '${item.nombre}', '${item.tipo}')" 
-                                title="Vista Previa" 
-                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-800 hover:text-white transition-all shadow-sm">
-                            <span class="material-symbols-outlined text-[18px]">visibility</span>
-                        </button>
-
-                        <button onclick="carruselController.borrarCarruselCompleto('${item.id}')" 
-                                title="Eliminar" 
-                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 text-red-500 border border-red-100 hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                            <span class="material-symbols-outlined text-[18px]">delete</span>
-                        </button>
-
-                    </div>
-                </td>
-            </tr>`;
+    <tr class="hover:bg-blue-50/40 transition-colors group">
+        ${cols.includes('nro') ? `
+        <td class="px-6 py-4 text-sm text-slate-400 font-bold text-center border-r border-slate-50/50">
+            ${index + 1}
+        </td>` : ''}
+        ${cols.includes('nombre') ? `
+        <td class="px-6 py-4 text-center">
+            <div class="flex flex-col items-center">
+                <span class="text-slate-800 font-bold uppercase text-[13px] tracking-wide">${item.nombre}</span>
+                <span class="text-[10px] text-slate-400 font-medium">${item.descripcion || 'SIN DESCRIPCIÓN'}</span>
+            </div>
+        </td>` : ''}
+        ${cols.includes('ubicacion') ? `
+        <td class="px-6 py-4 text-center">
+            <span class="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black border border-slate-200 uppercase shadow-sm">
+                ${item.ubicacion_slug}
+            </span>
+        </td>` : ''}
+        ${cols.includes('tipo') ? `
+        <td class="px-6 py-4 text-center text-sm text-slate-600 font-semibold uppercase">
+            ${item.tipo}
+        </td>` : ''}
+        ${cols.includes('acciones') ? `
+        <td class="px-6 py-4">
+            <div class="flex items-center justify-center gap-2">
+                <button onclick="carruselController.abrirEditor('${item.id}')" 
+                        title="Editar" 
+                        class="w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">edit</span>
+                </button>
+                <button onclick="carruselController_View.verDetalles('${item.id}', '${item.nombre}', '${item.tipo}')" 
+                        title="Vista Previa" 
+                        class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-800 hover:text-white transition-all shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">visibility</span>
+                </button>
+                <button onclick="carruselController.borrarCarruselCompleto('${item.id}')" 
+                        title="Eliminar" 
+                        class="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 text-red-500 border border-red-100 hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                </button>
+            </div>
+        </td>` : ''}
+    </tr>`;
     },
 
     async verDetalles(id, nombre, tipo) {
@@ -278,13 +282,13 @@ export const carruselController_View = {
     gestionarBusqueda(valor) {
         this._estado.busqueda = valor;
         this._estado.paginaActual = 1;
-        this.render();
+        carruselController.refrescarVista();
     },
 
     gestionarOrden() {
         this._estado.orden = this._estado.orden === 'asc' ? 'desc' : 'asc';
-        this.render();
-    }
+        carruselController.refrescarVista();
+    },
 };
 
 window.carruselController_View = carruselController_View;

@@ -5,20 +5,27 @@ import { RegisterCarrusel } from '../modules/carrusel/registerCarrusel.js';
 import { productoModel } from '../models/productoModel.js';
 import { categoriasModel } from '../models/categoriasModel.js';
 import { carruselState } from '../modules/carrusel/carruselState.js';
+import { configuracionColumnasController } from './configuracionColumnasController.js';
+import { usuarioModel } from '../models/usuarioModel.js';
 
-/**
- * Carrusel Controller - Nexus Admin Suite
- */
+
 export const carruselController = {
 
-    // ==========================================
-    // NAVEGACIÓN Y FLUJO
-    // ==========================================
+    _columnasVisibles: [],
 
     async inicializar() {
-        await carruselController_View.render();
+        const usuario = await usuarioModel.obtenerUsuarioActual();
+        this._columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
+            'carruseles',
+            ['nro', 'nombre', 'ubicacion', 'tipo', 'acciones'],
+            usuario?.id,
+            usuario?.rol
+        );
+        await carruselController_View.render(this._columnasVisibles);
     },
-
+    refrescarVista() {
+        carruselController_View.render(this._columnasVisibles);
+    },
     async abrirEditor(id = null) {
         if (id) {
             // 1. Obtenemos la configuración del carrusel (Cabecera)
@@ -175,10 +182,6 @@ export const carruselController = {
     // GESTIÓN DE ÍTEMS Y BÚSQUEDA
     // ==========================================
 
-    /**
-     * Búsqueda de ítems relacionados.
-     * CORRECCIÓN: Se usa el Model directamente para evitar errores de scope de Supabase.
-     */
     async buscarItemsRelacionados(tipo, termino) {
         try {
             if (!termino || termino.length < 2) return [];
@@ -274,7 +277,6 @@ export const carruselController = {
             activo: true
         };
 
-        console.log("📤 Controller enviando al Model:", payloadDB);
         return await carruselModel.agregarItem(payloadDB);
     }
 };

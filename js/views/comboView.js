@@ -1,89 +1,82 @@
-/**
- * comboView.js
- * Vista principal de tabla de combos con badges de estado, tipo y alcance.
- */
-
 import { ActionButtons } from '../utils/componentUtils.js';
 
 export const comboView = {
 
-    // ─────────────────────────────────────────────
-    // TABLA PRINCIPAL
-    // ─────────────────────────────────────────────
-    mostrarTabla(combos = []) {
+    mostrarTabla(combos = [], columnasVisibles = []) {
         const contenedor = document.getElementById('content-area');
         if (!contenedor) return;
-        contenedor.innerHTML = this._renderTabla(combos);
-        this._bindBuscador(combos);
+        const cols = columnasVisibles.length > 0 ? columnasVisibles :
+            ['nro', 'nombre', 'precio_descuento', 'alcance', 'vigencia', 'estado', 'acciones'];
+        contenedor.innerHTML = this._renderTabla(combos, cols);
+        this._bindBuscador(combos, cols);
     },
-
-    _renderTabla(combos) {
+    _renderTabla(combos, cols = []) {
         return `
-        <div class="flex flex-col h-full max-h-[calc(100vh-64px)] overflow-hidden bg-slate-50">
-
-            <!-- Header -->
-            <div class="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
-                <div>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[13px]">package_2</span>
-                        Gestión
-                    </p>
-                    <h1 class="text-xl font-black text-slate-800">Combos</h1>
-                </div>
-                <div class="flex items-center gap-3">
-                    <div class="relative">
-                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-                        <input id="combo-buscador" type="text" placeholder="Buscar combo..."
-                               class="bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-10 text-sm
-                                      outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500
-                                      transition-all font-medium text-slate-700 w-64">
-                        <button id="combo-btn-limpiar"
-                                class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6
-                                       flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all hidden">
-                            <span class="material-symbols-outlined text-[16px]">close</span>
-                        </button>
-                    </div>
-                    <button onclick="comboController.mostrarFormularioCrear()"
-                            class="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600
-                                   text-white rounded-xl font-black text-[10px] uppercase tracking-widest
-                                   transition-all shadow-md shadow-orange-200 active:scale-95">
-                        <span class="material-symbols-outlined text-base">add</span>
-                        Nuevo Combo
+    <div class="flex flex-col h-full max-h-[calc(100vh-64px)] overflow-hidden bg-slate-50">
+        <div class="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[13px]">package_2</span>
+                    Gestión
+                </p>
+                <h1 class="text-xl font-black text-slate-800">Combos</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                    <input id="combo-buscador" type="text" placeholder="Buscar combo..."
+                           class="bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-10 text-sm
+                                  outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500
+                                  transition-all font-medium text-slate-700 w-64">
+                    <button id="combo-btn-limpiar"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6
+                                   flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all hidden">
+                        <span class="material-symbols-outlined text-[16px]">close</span>
                     </button>
                 </div>
+                <button onclick="configuracionColumnasController.iniciarFlujoConfiguracion('combos', async () => { await comboController.inicializar(true); })"
+                        class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-blue-600 transition-all shadow-sm font-black text-[10px] uppercase tracking-widest">
+                    <span class="material-symbols-outlined text-base">view_column</span>
+                    Columnas
+                </button>
+                <button onclick="comboController.mostrarFormularioCrear()"
+                        class="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600
+                               text-white rounded-xl font-black text-[10px] uppercase tracking-widest
+                               transition-all shadow-md shadow-orange-200 active:scale-95">
+                    <span class="material-symbols-outlined text-base">add</span>
+                    Nuevo Combo
+                </button>
             </div>
-
-            <!-- Estadísticas -->
-            <div class="flex gap-4 px-6 py-3 bg-white border-b border-slate-100 flex-shrink-0">
-                ${this._renderStatCard('package_2', 'Total', combos.length, 'text-slate-600', 'bg-slate-50')}
-                ${this._renderStatCard('check_circle', 'Activos', combos.filter(c => this._calcularEstado(c) === 'activo').length, 'text-emerald-600', 'bg-emerald-50')}
-                ${this._renderStatCard('schedule', 'Programados', combos.filter(c => this._calcularEstado(c) === 'programado').length, 'text-amber-600', 'bg-amber-50')}
-                ${this._renderStatCard('cancel', 'Finalizados', combos.filter(c => this._calcularEstado(c) === 'finalizado').length, 'text-slate-400', 'bg-slate-50')}
-            </div>
-
-            <!-- Tabla -->
-            <div class="flex-1 overflow-auto px-6 py-4">
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-slate-100 bg-slate-50">
-                                <th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Combo</th>
-                                <th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Precio / Descuento</th>
-                                <th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Alcance</th>
-                                <th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vigencia</th>
-                                <th class="text-center px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>
-                                <th class="text-center px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="combo-tbody">
-                            ${combos.length === 0
+        </div>
+        <div class="flex gap-4 px-6 py-3 bg-white border-b border-slate-100 flex-shrink-0">
+            ${this._renderStatCard('package_2', 'Total', combos.length, 'text-slate-600', 'bg-slate-50')}
+            ${this._renderStatCard('check_circle', 'Activos', combos.filter(c => this._calcularEstado(c) === 'activo').length, 'text-emerald-600', 'bg-emerald-50')}
+            ${this._renderStatCard('schedule', 'Programados', combos.filter(c => this._calcularEstado(c) === 'programado').length, 'text-amber-600', 'bg-amber-50')}
+            ${this._renderStatCard('cancel', 'Finalizados', combos.filter(c => this._calcularEstado(c) === 'finalizado').length, 'text-slate-400', 'bg-slate-50')}
+        </div>
+        <div class="flex-1 overflow-auto px-6 py-4">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-100 bg-slate-50">
+                            ${cols.includes('nro') ? `<th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">N°</th>` : ''}
+                            ${cols.includes('nombre') ? `<th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Combo</th>` : ''}
+                            ${cols.includes('precio_descuento') ? `<th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Precio / Descuento</th>` : ''}
+                            ${cols.includes('alcance') ? `<th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Alcance</th>` : ''}
+                            ${cols.includes('vigencia') ? `<th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vigencia</th>` : ''}
+                            ${cols.includes('estado') ? `<th class="text-center px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>` : ''}
+                            ${cols.includes('acciones') ? `<th class="text-center px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones</th>` : ''}
+                        </tr>
+                    </thead>
+                    <tbody id="combo-tbody">
+                        ${combos.length === 0
                 ? this._renderVacio()
-                : combos.map(c => this._renderFila(c)).join('')}
-                        </tbody>
-                    </table>
-                </div>
+                : combos.map((c, i) => this._renderFila(c, i + 1, cols)).join('')}
+                    </tbody>
+                </table>
             </div>
-        </div>`;
+        </div>
+    </div>`;
     },
 
     _renderStatCard(icon, label, value, textColor, bgColor) {
@@ -97,7 +90,7 @@ export const comboView = {
         </div>`;
     },
 
-    _renderFila(c) {
+    _renderFila(c, numero, cols = []) {
         const estado = this._calcularEstado(c);
         const badgeEst = this._badgeEstado(estado);
         const esPrecioFijo = c.precio_fijo !== null && c.precio_fijo !== undefined;
@@ -106,83 +99,93 @@ export const comboView = {
             : `<span class="text-base font-black text-blue-600">-${parseFloat(c.porcentaje_descuento)}%</span>`;
         const badgeTipo = esPrecioFijo
             ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-100 text-orange-700 text-[10px] font-black uppercase">
-                   <span class="material-symbols-outlined text-[11px]">payments</span> Precio fijo
-               </span>`
+               <span class="material-symbols-outlined text-[11px]">payments</span> Precio fijo
+           </span>`
             : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-black uppercase">
-                   <span class="material-symbols-outlined text-[11px]">percent</span> Porcentaje
-               </span>`;
+               <span class="material-symbols-outlined text-[11px]">percent</span> Porcentaje
+           </span>`;
         const alcanceBadge = c.alcance === 'global'
             ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-[10px] font-black uppercase">
-                   <span class="material-symbols-outlined text-[11px]">public</span> Global
-               </span>`
+               <span class="material-symbols-outlined text-[11px]">public</span> Global
+           </span>`
             : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 border border-violet-100 text-violet-700 text-[10px] font-black uppercase">
-                   <span class="material-symbols-outlined text-[11px]">store</span>
-                   ${c.sucursal?.nombre || 'Sucursal'}
-               </span>`;
+               <span class="material-symbols-outlined text-[11px]">store</span>
+               ${c.sucursal?.nombre || 'Sucursal'}
+           </span>`;
         const fi = c.fecha_inicio ? new Date(c.fecha_inicio).toLocaleDateString('es-BO') : '—';
         const ff = c.fecha_fin ? new Date(c.fecha_fin).toLocaleDateString('es-BO') : '—';
 
         return `
-        <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-all group" data-id="${c.id}">
-            <td class="px-4 py-3">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 bg-orange-100 flex items-center justify-center">
-                        ${c.imagen_url
-                ? `<img src="${c.imagen_url}" class="w-full h-full object-cover">`
-                : `<span class="material-symbols-outlined text-orange-500 text-[18px]">package_2</span>`}
+    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-all group" data-id="${c.id}">
+        ${cols.includes('nro') ? `
+        <td class="px-4 py-3">
+            <span class="text-slate-400 font-bold text-xs">${numero}</span>
+        </td>` : ''}
+        ${cols.includes('nombre') ? `
+        <td class="px-4 py-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 bg-orange-100 flex items-center justify-center">
+                    ${c.imagen_url
+                    ? `<img src="${c.imagen_url}" class="w-full h-full object-cover">`
+                    : `<span class="material-symbols-outlined text-orange-500 text-[18px]">package_2</span>`}
+                </div>
+                <p class="font-black text-slate-800 text-sm">${c.nombre}</p>
+            </div>
+        </td>` : ''}
+        ${cols.includes('precio_descuento') ? `
+        <td class="px-4 py-3">
+            <div class="flex items-center gap-2 flex-wrap">
+                ${valorFmt}
+                ${badgeTipo}
+            </div>
+        </td>` : ''}
+        ${cols.includes('alcance') ? `
+        <td class="px-4 py-3">${alcanceBadge}</td>` : ''}
+        ${cols.includes('vigencia') ? `
+        <td class="px-4 py-3">
+            <div class="flex items-center gap-2">
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
+                        <span class="material-symbols-outlined text-emerald-500 text-[13px]">event_available</span>
+                        ${fi}
                     </div>
-                    <p class="font-black text-slate-800 text-sm">${c.nombre}</p>
-                </div>
-            </td>
-            <td class="px-4 py-3">
-                <div class="flex items-center gap-2 flex-wrap">
-                    ${valorFmt}
-                    ${badgeTipo}
-                </div>
-            </td>
-            <td class="px-4 py-3">${alcanceBadge}</td>
-            <td class="px-4 py-3">
-                <div class="flex items-center gap-2">
-                    <div class="flex flex-col gap-1">
-                        <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
-                            <span class="material-symbols-outlined text-emerald-500 text-[13px]">event_available</span>
-                            ${fi}
-                        </div>
-                        <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
-                            <span class="material-symbols-outlined text-red-400 text-[13px]">event_busy</span>
-                            ${ff}
-                        </div>
+                    <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
+                        <span class="material-symbols-outlined text-red-400 text-[13px]">event_busy</span>
+                        ${ff}
                     </div>
-                    <button onclick="comboView.abrirModalFecha(${c.id}, '${c.fecha_inicio || ''}', '${c.fecha_fin || ''}')"
-                            title="Cambiar fechas"
-                            class="w-7 h-7 flex items-center justify-center rounded-lg bg-amber-50 border border-amber-100
-                                   hover:bg-amber-100 text-amber-500 hover:text-amber-600 transition-all flex-shrink-0">
-                        <span class="material-symbols-outlined text-[15px]">edit_calendar</span>
-                    </button>
                 </div>
-            </td>
-            <td class="px-4 py-3 text-center">
-                <div class="flex flex-col items-center gap-1.5">
-                    ${badgeEst}
-                    <button onclick="comboController.toggleActivo(${c.id}, ${!c.activo})"
-                            title="${c.activo ? 'Desactivar' : 'Activar'}"
-                            class="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase transition-all
-                                   ${c.activo
-                ? 'bg-emerald-50 hover:bg-red-50 text-emerald-600 hover:text-red-500'
-                : 'bg-slate-100 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600'}">
-                        <span class="material-symbols-outlined text-[12px]">${c.activo ? 'toggle_on' : 'toggle_off'}</span>
-                        ${c.activo ? 'Activo' : 'Inactivo'}
-                    </button>
-                </div>
-            </td>
-            <td class="px-4 py-3">
-                <div class="flex items-center justify-center gap-1">
-                    ${ActionButtons.render(c.id, 'visibility', 'Ver', 'indigo', 'comboController.ver')}
-                    ${ActionButtons.render(c.id, 'edit', 'Editar', 'blue', 'comboController.editar')}
-                    ${ActionButtons.render(c.id, 'delete', 'Eliminar', 'red', 'comboController.verEliminar')}
-                </div>
-            </td>
-        </tr>`;
+                <button onclick="comboView.abrirModalFecha(${c.id}, '${c.fecha_inicio || ''}', '${c.fecha_fin || ''}')"
+                        title="Cambiar fechas"
+                        class="w-7 h-7 flex items-center justify-center rounded-lg bg-amber-50 border border-amber-100
+                               hover:bg-amber-100 text-amber-500 hover:text-amber-600 transition-all flex-shrink-0">
+                    <span class="material-symbols-outlined text-[15px]">edit_calendar</span>
+                </button>
+            </div>
+        </td>` : ''}
+        ${cols.includes('estado') ? `
+        <td class="px-4 py-3 text-center">
+            <div class="flex flex-col items-center gap-1.5">
+                ${badgeEst}
+                <button onclick="comboController.toggleActivo(${c.id}, ${!c.activo})"
+                        title="${c.activo ? 'Desactivar' : 'Activar'}"
+                        class="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase transition-all
+                               ${c.activo
+                    ? 'bg-emerald-50 hover:bg-red-50 text-emerald-600 hover:text-red-500'
+                    : 'bg-slate-100 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600'}">
+                    <span class="material-symbols-outlined text-[12px]">${c.activo ? 'toggle_on' : 'toggle_off'}</span>
+                    ${c.activo ? 'Activo' : 'Inactivo'}
+                </button>
+            </div>
+        </td>` : ''}
+        ${cols.includes('acciones') ? `
+        <td class="px-4 py-3">
+            <div class="flex items-center justify-center gap-1">
+                ${ActionButtons.render(c.id, 'visibility', 'Ver', 'indigo', 'comboController.ver')}
+                ${ActionButtons.render(c.id, 'edit', 'Editar', 'blue', 'comboController.editar')}
+                ${ActionButtons.render(c.id, 'delete', 'Eliminar', 'red', 'comboController.verEliminar')}
+            </div>
+        </td>` : ''}
+    </tr>`;
     },
 
     // ─────────────────────────────────────────────
@@ -312,7 +315,7 @@ export const comboView = {
     // ─────────────────────────────────────────────
     // BUSCADOR
     // ─────────────────────────────────────────────
-    _bindBuscador(combos) {
+    _bindBuscador(combos, cols = []) {
         const input = document.getElementById('combo-buscador');
         const btnX = document.getElementById('combo-btn-limpiar');
         const tbody = document.getElementById('combo-tbody');
@@ -327,7 +330,7 @@ export const comboView = {
                 : combos;
             tbody.innerHTML = filtrados.length === 0
                 ? this._renderVacio()
-                : filtrados.map(c => this._renderFila(c)).join('');
+                : filtrados.map((c, i) => this._renderFila(c, i + 1, cols)).join('');
             btnX?.classList.toggle('hidden', !q);
         };
         input.addEventListener('input', (e) => filtrar(e.target.value.trim()));

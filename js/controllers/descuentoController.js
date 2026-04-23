@@ -1,33 +1,39 @@
-/**
- * descuentoController.js
- * Controlador MVC para el módulo de descuentos.
- */
-
 import { descuentoModel } from '../models/descuentoModel.js';
 import { descuentoView } from '../views/descuentoView.js';
 import { descuentoFormView } from '../views/descuentoFormView.js';
+import { configuracionColumnasController } from './configuracionColumnasController.js';
+import { usuarioModel } from '../models/usuarioModel.js';
 
 export const descuentoController = {
 
     _datosCache: [],
+    _columnasVisibles: [],
 
-    // ─────────────────────────────────────────────
-    // INICIALIZAR TABLA
-    // ─────────────────────────────────────────────
     async inicializar(silencioso = false) {
         if (!silencioso) descuentoView.mostrarCargando('Cargando descuentos...');
-
         try {
+            const usuario = await usuarioModel.obtenerUsuarioActual();
+            console.log('usuario actual:', usuario);
+
+            this._columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
+                'descuentos',
+                ['nro', 'nombre', 'valor', 'alcance', 'vigencia', 'estado', 'acciones'],
+                usuario?.id,
+                usuario?.rol
+            );
+            console.log('columnas resultantes:', this._columnasVisibles);
             this._datosCache = await descuentoModel.getAll();
             Swal.close();
-            descuentoView.mostrarTabla(this._datosCache);
+            descuentoView.mostrarTabla(this._datosCache, this._columnasVisibles);
         } catch (error) {
             console.error('Controller Error [descuento.inicializar]:', error);
             Swal.close();
             descuentoView.notificarError('Error al cargar los descuentos.');
         }
     },
-
+    refrescarVista() {
+        descuentoView.mostrarTabla(this._datosCache, this._columnasVisibles);
+    },
     // ─────────────────────────────────────────────
     // CREAR
     // ─────────────────────────────────────────────

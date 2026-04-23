@@ -17,6 +17,9 @@ export const configuracionColumnasController = {
         sucursales: ['nro', 'sucursal', 'direccion', 'productos', 'acciones'],
         departamentos: ['nro', 'departamento', 'acciones'],
         direcciones: ['nro', 'cliente', 'etiqueta', 'direccion', 'referencia', 'mapa', 'acciones'],
+        descuentos: ['nro', 'nombre', 'valor', 'alcance', 'vigencia', 'estado', 'acciones'],
+        combos: ['nro', 'nombre', 'precio_descuento', 'alcance', 'vigencia', 'estado', 'acciones'],
+        carruseles: ['nro', 'nombre', 'ubicacion', 'tipo', 'acciones']
     },
     // --- Agregar esto dentro de configuracionColumnasController ---
 
@@ -149,7 +152,7 @@ export const configuracionColumnasController = {
 
                     if (res.exito) {
                         configuracionColumnasView.notificarExito('Configuración guardada correctamente');
-                        if (callbackRecargar) callbackRecargar(seleccionadas);
+                        if (callbackRecargar) callbackRecargar();
                         break; // Finaliza el flujo
                     } else {
                         configuracionColumnasView.notificarError(res.mensaje);

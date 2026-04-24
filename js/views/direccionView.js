@@ -1,5 +1,6 @@
 import { PaginationHelper } from '../utils/paginationHelper.js';
 import { ActionButtons } from '../utils/componentUtils.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const direccionView = {
 
@@ -11,6 +12,97 @@ export const direccionView = {
     },
     _mapaDetalle: null,
     _mapaEliminar: null,
+
+    // ─────────────────────────────────────────────
+    // SELECCIÓN POR LOTE
+    // ─────────────────────────────────────────────
+
+    toggleLote(id) {
+        selectorUtil.toggle(id, (cant) => this._actualizarBarraFlotante(cant));
+        const fila = document.querySelector(`input.fila-checkbox-dir[data-id="${id}"]`)?.closest('tr');
+        if (fila) fila.classList.toggle('bg-blue-50/70', selectorUtil.estado.seleccionados.includes(String(id)));
+    },
+
+    toggleLoteTodos(datos) {
+        selectorUtil.toggleTodos(datos, (cant) => this._actualizarBarraFlotante(cant));
+        const isAllChecked = selectorUtil.estado.seleccionados.length >= datos.length;
+        document.querySelectorAll('input.fila-checkbox-dir').forEach(chk => {
+            chk.checked = isAllChecked;
+            chk.closest('tr')?.classList.toggle('bg-blue-50/70', isAllChecked);
+        });
+        const master = document.getElementById('check-all-dir');
+        if (master) master.checked = isAllChecked;
+    },
+
+    limpiarSeleccion() {
+        selectorUtil.limpiar((cant) => this._actualizarBarraFlotante(cant));
+        direccionController.refrescarVista();
+    },
+
+    _renderBarraFlotante() {
+        return `
+        <div id="bulk-actions-bar-dir"
+             class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60]
+                    translate-y-28 opacity-0 pointer-events-none
+                    transition-all duration-500">
+            <div class="bg-white/95 backdrop-blur-xl border border-slate-200 p-2.5 rounded-[26px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex items-center gap-2">
+                <div class="flex items-center gap-3 px-4 py-2 border-r border-slate-100 mr-1">
+                    <div class="w-9 h-9 bg-red-600 rounded-xl flex items-center justify-center shadow-red-200 shadow-lg">
+                        <span class="material-symbols-outlined text-white text-xl">location_on</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span id="lote-dir-contador" class="text-[13px] font-bold text-slate-800 leading-none">0 seleccionados</span>
+                        <span class="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">Acciones masivas</span>
+                    </div>
+                </div>
+                <button onclick="direccionView.confirmarEliminacionMasiva()"
+                        class="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 group">
+                    <span class="material-symbols-outlined text-lg">delete_sweep</span>
+                    <span class="text-[11px] font-black uppercase tracking-tight">Eliminar</span>
+                </button>
+                <button onclick="direccionView.limpiarSeleccion()"
+                        class="w-11 h-11 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-all ml-1">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+        </div>`;
+    },
+
+    _actualizarBarraFlotante(cantidad) {
+        const barra = document.getElementById('bulk-actions-bar-dir');
+        const contador = document.getElementById('lote-dir-contador');
+        if (!barra) return;
+        if (cantidad > 0) {
+            barra.classList.remove('translate-y-28', 'opacity-0', 'pointer-events-none');
+            barra.classList.add('translate-y-0', 'opacity-100');
+            if (contador) contador.textContent = `${cantidad} seleccionados`;
+        } else {
+            barra.classList.add('translate-y-28', 'opacity-0', 'pointer-events-none');
+            barra.classList.remove('translate-y-0', 'opacity-100');
+        }
+    },
+
+    confirmarEliminacionMasiva() {
+        const ids = selectorUtil.estado.seleccionados;
+        if (ids.length === 0) return;
+        Swal.fire({
+            title: `<span class="text-red-600 font-black uppercase text-xs">¿ELIMINAR ${ids.length} DIRECCIONES?</span>`,
+            html: `<p class="text-sm text-slate-600">Se eliminarán permanentemente las direcciones seleccionadas. No se puede deshacer.</p>`,
+            icon: 'warning',
+            showCancelButton: true,
+            reverseButtons: true,
+            confirmButtonText: 'SÍ, ELIMINAR TODO',
+            cancelButtonText: 'CANCELAR',
+            confirmButtonColor: '#ef4444',
+            customClass: {
+                popup: 'rounded-[32px] shadow-2xl',
+                confirmButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase',
+                cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase'
+            }
+        }).then(r => {
+            if (r.isConfirmed) direccionController.eliminarMasivo(ids);
+        });
+    },
 
     // ─────────────────────────────────────────────
     // NOTIFICACIONES
@@ -110,6 +202,8 @@ export const direccionView = {
         const inicio = (this._estado.paginaActual - 1) * this._estado.filasPorPagina;
         const datosPaginados = datosFiltrados.slice(inicio, inicio + this._estado.filasPorPagina);
 
+        window._direccionesPaginadas = datosPaginados;
+
         contenedor.innerHTML = `
     <div class="p-8 animate-fade-in max-h-[calc(100vh-64px)] overflow-y-auto">
 
@@ -164,6 +258,11 @@ export const direccionView = {
                 <table class="w-full text-left border-collapse table-auto">
                     <thead>
                         <tr class="bg-slate-50/80 border-b border-slate-200">
+                            <th class="px-4 py-5 w-12 text-center">
+                                <input type="checkbox" id="check-all-dir"
+                                       class="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                       onchange="direccionView.toggleLoteTodos(window._direccionesPaginadas)">
+                            </th>
                             ${cols.includes('nro') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-12 text-center">N°</th>` : ''}
                             ${cols.includes('cliente') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Cliente</th>` : ''}
                             ${cols.includes('etiqueta') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Etiqueta</th>` : ''}
@@ -183,7 +282,12 @@ export const direccionView = {
             </div>
             ${PaginationHelper.render(datosFiltrados.length, this._estado.filasPorPagina, this._estado.paginaActual, 'direccionView')}
         </div>
-    </div>`;
+    </div>` + this._renderBarraFlotante();
+
+        setTimeout(() => {
+            selectorUtil.sincronizarChecks();
+            this._actualizarBarraFlotante(selectorUtil.estado.seleccionados.length);
+        }, 0);
 
         this._enfocarBusqueda();
     },
@@ -192,9 +296,16 @@ export const direccionView = {
         const nombre = this._nombreCompleto(d.usuario);
         const iniciales = this._iniciales(d.usuario);
         const esPpal = d.es_principal;
+        const isChecked = selectorUtil.estado.seleccionados.includes(String(d.id)) ? 'checked' : '';
 
         return `
-    <tr class="hover:bg-slate-50/50 transition-colors group">
+    <tr class="hover:bg-slate-50/50 transition-colors group ${isChecked ? 'bg-blue-50/70' : ''}">
+        <td class="px-4 py-4 text-center">
+            <input type="checkbox" ${isChecked}
+                   class="fila-checkbox-dir w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                   data-id="${d.id}"
+                   onchange="direccionView.toggleLote('${d.id}')">
+        </td>
         ${cols.includes('nro') ? `
         <td class="px-6 py-4 text-center">
             <span class="text-slate-400 font-bold text-xs">${numero}</span>

@@ -2,6 +2,7 @@ import { sucursalModel } from '../models/sucursalModel.js';
 import { sucursalView } from '../views/sucursalView.js';
 import { usuarioModel } from '../models/usuarioModel.js';
 import { configuracionColumnasController } from './configuracionColumnasController.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const sucursalController = {
     _columnasVisibles: [],
@@ -9,6 +10,7 @@ export const sucursalController = {
 
     async inicializar(silencioso = false) {
         try {
+            if (!silencioso) selectorUtil.limpiar();
             if (!silencioso) sucursalView.mostrarCargando('Cargando sucursales...');
 
             const usuario = await usuarioModel.obtenerUsuarioActual();
@@ -165,6 +167,21 @@ export const sucursalController = {
     },
     refrescarVista() {
         sucursalView.render(this._datosCache, this._columnasVisibles);
+    },
+
+    async eliminarMasivo(ids) {
+        sucursalView.mostrarCargando('Eliminando sucursales...');
+        try {
+            for (const id of ids) {
+                await sucursalModel.delete(id);
+            }
+            sucursalView.limpiarSeleccion();
+            await this.inicializar(true);
+            sucursalView.notificarExito(`${ids.length} sucursales eliminadas correctamente.`);
+        } catch (error) {
+            console.error(error);
+            sucursalView.notificarError('Error al eliminar algunas sucursales.');
+        }
     },
 };
 

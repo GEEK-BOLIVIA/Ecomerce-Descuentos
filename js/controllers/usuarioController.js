@@ -4,6 +4,7 @@ import { detalleUsuarioModal } from '../views/components/detalleUsuarioModal.js'
 import { editarUsuarioModal } from '../views/components/editarUsuarioModal.js';
 import { eliminarUsuarioModal } from '../views/components/eliminarUsuarioModal.js';
 import { configuracionColumnasController } from './configuracionColumnasController.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const usuarioController = {
     _columnasVisiblesPorRol: {},
@@ -169,6 +170,7 @@ export const usuarioController = {
 
     async inicializarSeccion(rol) {
         try {
+            selectorUtil.limpiar();
             if (document.activeElement) document.activeElement.blur();
 
             const config = this._configuraciones[rol.toLowerCase()];
@@ -202,6 +204,21 @@ export const usuarioController = {
         const columnasVisibles = this._columnasVisiblesPorRol[this._estado.rolActual] ||
             ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'];
         usuarioView.render(datos, this._estado.configActual, columnasVisibles);
+    },
+
+    async eliminarMasivo(ids) {
+        usuarioView.mostrarCargando('Desactivando usuarios...');
+        try {
+            for (const id of ids) {
+                await usuarioModel.actualizar(id, { visible: false });
+            }
+            usuarioView.limpiarSeleccion();
+            await this.refrescarVista();
+            usuarioView.notificarExito(`${ids.length} usuarios eliminados correctamente.`);
+        } catch (error) {
+            console.error(error);
+            usuarioView.notificarError('Error al eliminar algunos usuarios.');
+        }
     },
 
     /**

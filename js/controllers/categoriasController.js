@@ -1,6 +1,7 @@
 import { categoriasModel } from '../models/categoriasModel.js';
 import { configuracionColumnasController } from './configuracionColumnasController.js';
 import { categoriasView } from '../views/categoriasView.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const categoriasController = {
     // Definimos las columnas que el código necesita pero el usuario no debe configurar
@@ -20,6 +21,7 @@ export const categoriasController = {
 
     async inicializar(pestanaPorDefecto = 'categorias') {
         try {
+            selectorUtil.limpiar();
             categoriasView.mostrarCargando('Cargando catálogo...');
 
             // OBTENER USUARIO
@@ -81,10 +83,24 @@ export const categoriasController = {
         const res = await categoriasModel.eliminar(id);
         if (res.exito) {
             categoriasView.notificarExito('Registro eliminado correctamente');
-            // Recargamos manteniendo la pestaña actual del estado de la vista
             this.inicializar(categoriasView._estado.pestanaActiva);
         } else {
             categoriasView.notificarError(res.mensaje);
+        }
+    },
+
+    async eliminarMasivo(ids) {
+        categoriasView.mostrarCargando('Eliminando registros...');
+        try {
+            for (const id of ids) {
+                await categoriasModel.eliminar(id);
+            }
+            categoriasView.limpiarSeleccion();
+            await this.inicializar(categoriasView._estado.pestanaActiva);
+            categoriasView.notificarExito(`${ids.length} registros eliminados correctamente.`);
+        } catch (error) {
+            console.error(error);
+            categoriasView.notificarError('Error al eliminar algunos registros.');
         }
     },
 

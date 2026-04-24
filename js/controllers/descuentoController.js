@@ -3,6 +3,7 @@ import { descuentoView } from '../views/descuentoView.js';
 import { descuentoFormView } from '../views/descuentoFormView.js';
 import { configuracionColumnasController } from './configuracionColumnasController.js';
 import { usuarioModel } from '../models/usuarioModel.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const descuentoController = {
 
@@ -10,6 +11,7 @@ export const descuentoController = {
     _columnasVisibles: [],
 
     async inicializar(silencioso = false) {
+        if (!silencioso) selectorUtil.limpiar();
         if (!silencioso) descuentoView.mostrarCargando('Cargando descuentos...');
         try {
             const usuario = await usuarioModel.obtenerUsuarioActual();
@@ -33,6 +35,38 @@ export const descuentoController = {
     },
     refrescarVista() {
         descuentoView.mostrarTabla(this._datosCache, this._columnasVisibles);
+    },
+
+    async eliminarMasivo(ids) {
+        descuentoView.mostrarCargando('Eliminando descuentos...');
+        try {
+            for (const id of ids) {
+                await descuentoModel.delete(id);
+            }
+            descuentoView.limpiarSeleccion();
+            await this.inicializar(true);
+            descuentoView.notificarExito(`${ids.length} descuentos eliminados correctamente.`);
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            descuentoView.notificarError('Error al eliminar algunos descuentos.');
+        }
+    },
+
+    async toggleActivoMasivo(ids, nuevoEstado) {
+        descuentoView.mostrarCargando(nuevoEstado ? 'Activando descuentos...' : 'Desactivando descuentos...');
+        try {
+            for (const id of ids) {
+                await descuentoModel.toggleActivo(id, nuevoEstado);
+            }
+            descuentoView.limpiarSeleccion();
+            await this.inicializar(true);
+            descuentoView.notificarExito(`${ids.length} descuentos ${nuevoEstado ? 'activados' : 'desactivados'} correctamente.`);
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            descuentoView.notificarError('Error al cambiar el estado de algunos descuentos.');
+        }
     },
     // ─────────────────────────────────────────────
     // CREAR

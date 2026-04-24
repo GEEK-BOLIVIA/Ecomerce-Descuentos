@@ -2,6 +2,7 @@ import { PaginationHelper } from '../utils/paginationHelper.js';
 import { detalleUsuarioModal } from './components/detalleUsuarioModal.js';
 import { eliminarUsuarioModal } from './components/eliminarUsuarioModal.js';
 import { completarPerfilModal } from './components/completarPerfilModal.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const usuarioView = {
     // Estado local para manejar UI de cada rol de forma independiente
@@ -11,6 +12,97 @@ export const usuarioView = {
         paginaActual: 1,
         filasPorPagina: 10,
         rolActual: ''
+    },
+
+    // ─────────────────────────────────────────────
+    // SELECCIÓN POR LOTE
+    // ─────────────────────────────────────────────
+
+    toggleLote(id) {
+        selectorUtil.toggle(id, (cant) => this._actualizarBarraFlotante(cant));
+        const fila = document.querySelector(`input.fila-checkbox-usr[data-id="${id}"]`)?.closest('tr');
+        if (fila) fila.classList.toggle('bg-blue-50/70', selectorUtil.estado.seleccionados.includes(String(id)));
+    },
+
+    toggleLoteTodos(datos) {
+        selectorUtil.toggleTodos(datos, (cant) => this._actualizarBarraFlotante(cant));
+        const isAllChecked = selectorUtil.estado.seleccionados.length >= datos.length;
+        document.querySelectorAll('input.fila-checkbox-usr').forEach(chk => {
+            chk.checked = isAllChecked;
+            chk.closest('tr')?.classList.toggle('bg-blue-50/70', isAllChecked);
+        });
+        const master = document.getElementById('check-all-usr');
+        if (master) master.checked = isAllChecked;
+    },
+
+    limpiarSeleccion() {
+        selectorUtil.limpiar((cant) => this._actualizarBarraFlotante(cant));
+        usuarioController.refrescarVista();
+    },
+
+    _renderBarraFlotante() {
+        return `
+        <div id="bulk-actions-bar-usr"
+             class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60]
+                    translate-y-28 opacity-0 pointer-events-none
+                    transition-all duration-500">
+            <div class="bg-white/95 backdrop-blur-xl border border-slate-200 p-2.5 rounded-[26px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex items-center gap-2">
+                <div class="flex items-center gap-3 px-4 py-2 border-r border-slate-100 mr-1">
+                    <div class="w-9 h-9 bg-red-600 rounded-xl flex items-center justify-center shadow-red-200 shadow-lg">
+                        <span class="material-symbols-outlined text-white text-xl">group</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span id="lote-usr-contador" class="text-[13px] font-bold text-slate-800 leading-none">0 seleccionados</span>
+                        <span class="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">Acciones masivas</span>
+                    </div>
+                </div>
+                <button onclick="usuarioView.confirmarEliminacionMasiva()"
+                        class="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all duration-300 group">
+                    <span class="material-symbols-outlined text-lg">delete_sweep</span>
+                    <span class="text-[11px] font-black uppercase tracking-tight">Eliminar</span>
+                </button>
+                <button onclick="usuarioView.limpiarSeleccion()"
+                        class="w-11 h-11 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-all ml-1">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+        </div>`;
+    },
+
+    _actualizarBarraFlotante(cantidad) {
+        const barra = document.getElementById('bulk-actions-bar-usr');
+        const contador = document.getElementById('lote-usr-contador');
+        if (!barra) return;
+        if (cantidad > 0) {
+            barra.classList.remove('translate-y-28', 'opacity-0', 'pointer-events-none');
+            barra.classList.add('translate-y-0', 'opacity-100');
+            if (contador) contador.textContent = `${cantidad} seleccionados`;
+        } else {
+            barra.classList.add('translate-y-28', 'opacity-0', 'pointer-events-none');
+            barra.classList.remove('translate-y-0', 'opacity-100');
+        }
+    },
+
+    confirmarEliminacionMasiva() {
+        const ids = selectorUtil.estado.seleccionados;
+        if (ids.length === 0) return;
+        Swal.fire({
+            title: `<span class="text-red-600 font-black uppercase text-xs">¿ELIMINAR ${ids.length} USUARIOS?</span>`,
+            html: `<p class="text-sm text-slate-600">Los usuarios seleccionados serán desactivados del sistema. No se puede deshacer.</p>`,
+            icon: 'warning',
+            showCancelButton: true,
+            reverseButtons: true,
+            confirmButtonText: 'SÍ, ELIMINAR TODO',
+            cancelButtonText: 'CANCELAR',
+            confirmButtonColor: '#ef4444',
+            customClass: {
+                popup: 'rounded-[32px] shadow-2xl',
+                confirmButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase',
+                cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase'
+            }
+        }).then(r => {
+            if (r.isConfirmed) usuarioController.eliminarMasivo(ids);
+        });
     },
 
     /**
@@ -128,6 +220,11 @@ export const usuarioView = {
                 <table class="w-full text-left border-collapse table-auto"> 
                     <thead>
                         <tr class="bg-slate-50/80 border-b border-slate-200">
+                            <th class="px-4 py-5 w-12 text-center">
+                                <input type="checkbox" id="check-all-usr"
+                                       class="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                       onchange="usuarioView.toggleLoteTodos(window._usuariosPaginados)">
+                            </th>
                             ${cols.includes('nro') ? `<th class="px-4 py-5 text-[11px] font-bold text-slate-400 uppercase w-12 text-center">N°</th>` : ''}
                             ${cols.includes('perfil') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase w-20 text-center">Perfil</th>` : ''}
                             ${cols.includes('nombre') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Nombre Completo</th>` : ''}
@@ -149,14 +246,29 @@ export const usuarioView = {
     </div>
     `;
 
-        contenedor.innerHTML = html;
+        window._usuariosPaginados = datosPaginados;
+
+        contenedor.innerHTML = html + this._renderBarraFlotante();
+
+        setTimeout(() => {
+            selectorUtil.sincronizarChecks();
+            this._actualizarBarraFlotante(selectorUtil.estado.seleccionados.length);
+        }, 0);
+
         this._enfocarBusqueda();
     },
 
     _crearFila(u, color, numero, cols = []) {
         const nombreCompleto = `${u.nombres} ${u.apellido_paterno} ${u.apellido_materno || ''}`.trim();
+        const isChecked = selectorUtil.estado.seleccionados.includes(String(u.id)) ? 'checked' : '';
         return `
-        <tr class="hover:bg-slate-50/50 transition-colors group">
+        <tr class="hover:bg-slate-50/50 transition-colors group ${isChecked ? 'bg-blue-50/70' : ''}">
+            <td class="px-4 py-4 text-center">
+                <input type="checkbox" ${isChecked}
+                       class="fila-checkbox-usr w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                       data-id="${u.id}"
+                       onchange="usuarioView.toggleLote('${u.id}')">
+            </td>
             ${cols.includes('nro') ? `
             <td class="px-4 py-4 text-center">
                 <span class="text-slate-400 font-bold text-xs">${numero}</span>

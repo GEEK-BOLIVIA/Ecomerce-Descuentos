@@ -7,6 +7,7 @@ import { categoriasModel } from '../models/categoriasModel.js';
 import { carruselState } from '../modules/carrusel/carruselState.js';
 import { configuracionColumnasController } from './configuracionColumnasController.js';
 import { usuarioModel } from '../models/usuarioModel.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 
 export const carruselController = {
@@ -14,6 +15,7 @@ export const carruselController = {
     _columnasVisibles: [],
 
     async inicializar() {
+        selectorUtil.limpiar();
         const usuario = await usuarioModel.obtenerUsuarioActual();
         this._columnasVisibles = await configuracionColumnasController.obtenerColumnasVisibles(
             'carruseles',
@@ -25,6 +27,21 @@ export const carruselController = {
     },
     refrescarVista() {
         carruselController_View.render(this._columnasVisibles);
+    },
+
+    async eliminarMasivo(ids) {
+        carruselController_View.notificarExito('Eliminando...');
+        try {
+            for (const id of ids) {
+                await carruselModel.eliminar(id);
+            }
+            carruselController_View.limpiarSeleccion();
+            await carruselController_View.render(this._columnasVisibles);
+            carruselController_View.notificarExito(`${ids.length} carruseles eliminados correctamente.`);
+        } catch (error) {
+            console.error(error);
+            carruselController_View.notificarError('Error al eliminar algunos carruseles.');
+        }
     },
     async abrirEditor(id = null) {
         if (id) {

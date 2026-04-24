@@ -1,14 +1,124 @@
 import { ActionButtons } from '../utils/componentUtils.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const comboView = {
+
+    // ─────────────────────────────────────────────
+    // SELECCIÓN POR LOTE
+    // ─────────────────────────────────────────────
+
+    toggleLote(id) {
+        selectorUtil.toggle(id, (cant) => this._actualizarBarraFlotante(cant));
+        const fila = document.querySelector(`input.fila-checkbox-combo[data-id="${id}"]`)?.closest('tr');
+        if (fila) fila.classList.toggle('bg-blue-50/70', selectorUtil.estado.seleccionados.includes(String(id)));
+    },
+
+    toggleLoteTodos(datos) {
+        selectorUtil.toggleTodos(datos, (cant) => this._actualizarBarraFlotante(cant));
+        const isAllChecked = selectorUtil.estado.seleccionados.length >= datos.length;
+        document.querySelectorAll('input.fila-checkbox-combo').forEach(chk => {
+            chk.checked = isAllChecked;
+            chk.closest('tr')?.classList.toggle('bg-blue-50/70', isAllChecked);
+        });
+        const master = document.getElementById('check-all-combo');
+        if (master) master.checked = isAllChecked;
+    },
+
+    limpiarSeleccion() {
+        selectorUtil.limpiar((cant) => this._actualizarBarraFlotante(cant));
+        window.comboController.refrescarVista();
+    },
+
+    _renderBarraFlotante() {
+        return `
+        <div id="bulk-actions-bar-combo"
+             class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60]
+                    translate-y-28 opacity-0 pointer-events-none transition-all duration-500">
+            <div class="bg-white/95 backdrop-blur-xl border border-slate-200 p-2.5 rounded-[26px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex items-center gap-2">
+                <div class="flex items-center gap-3 px-4 py-2 border-r border-slate-100 mr-1">
+                    <div class="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center shadow-orange-200 shadow-lg">
+                        <span class="material-symbols-outlined text-white text-xl">package_2</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span id="lote-combo-contador" class="text-[13px] font-bold text-slate-800 leading-none">0 seleccionados</span>
+                        <span class="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">Acciones masivas</span>
+                    </div>
+                </div>
+                <button onclick="comboView.accionLote('activar')"
+                        class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all duration-300">
+                    <span class="material-symbols-outlined text-lg">toggle_on</span>
+                    <span class="text-[11px] font-black uppercase">Activar</span>
+                </button>
+                <button onclick="comboView.accionLote('desactivar')"
+                        class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-50 text-slate-500 hover:bg-slate-800 hover:text-white transition-all duration-300">
+                    <span class="material-symbols-outlined text-lg">toggle_off</span>
+                    <span class="text-[11px] font-black uppercase">Desactivar</span>
+                </button>
+                <div class="w-px h-8 bg-slate-100 mx-1"></div>
+                <button onclick="comboView.accionLote('eliminar')"
+                        class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all duration-300">
+                    <span class="material-symbols-outlined text-lg">delete_sweep</span>
+                    <span class="text-[11px] font-black uppercase">Eliminar</span>
+                </button>
+                <button onclick="comboView.limpiarSeleccion()"
+                        class="w-11 h-11 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-200 transition-all ml-1">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+        </div>`;
+    },
+
+    _actualizarBarraFlotante(cantidad) {
+        const barra = document.getElementById('bulk-actions-bar-combo');
+        const contador = document.getElementById('lote-combo-contador');
+        if (!barra) return;
+        if (cantidad > 0) {
+            barra.classList.remove('translate-y-28', 'opacity-0', 'pointer-events-none');
+            barra.classList.add('translate-y-0', 'opacity-100');
+            if (contador) contador.textContent = `${cantidad} seleccionados`;
+        } else {
+            barra.classList.add('translate-y-28', 'opacity-0', 'pointer-events-none');
+            barra.classList.remove('translate-y-0', 'opacity-100');
+        }
+    },
+
+    accionLote(accion) {
+        const ids = selectorUtil.estado.seleccionados;
+        if (ids.length === 0) return;
+        if (accion === 'eliminar') {
+            Swal.fire({
+                title: `<span class="text-red-600 font-black uppercase text-xs">¿ELIMINAR ${ids.length} COMBOS?</span>`,
+                html: `<p class="text-sm text-slate-600">Esta acción eliminará los combos y sus asignaciones. No se puede deshacer.</p>`,
+                icon: 'warning', showCancelButton: true, reverseButtons: true,
+                confirmButtonText: 'SÍ, ELIMINAR TODO', cancelButtonText: 'CANCELAR',
+                confirmButtonColor: '#ef4444',
+                customClass: { popup: 'rounded-[32px] shadow-2xl', confirmButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase', cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase' }
+            }).then(r => { if (r.isConfirmed) window.comboController.eliminarMasivo(ids); });
+        } else {
+            const nuevoEstado = accion === 'activar';
+            Swal.fire({
+                title: `<span class="text-slate-800 font-black uppercase text-xs">¿${nuevoEstado ? 'ACTIVAR' : 'DESACTIVAR'} ${ids.length} COMBOS?</span>`,
+                html: `<p class="text-sm text-slate-600">Se ${nuevoEstado ? 'activarán' : 'desactivarán'} los ${ids.length} combos seleccionados.</p>`,
+                icon: 'question', showCancelButton: true, reverseButtons: true,
+                confirmButtonText: `SÍ, ${nuevoEstado ? 'ACTIVAR' : 'DESACTIVAR'}`, cancelButtonText: 'CANCELAR',
+                confirmButtonColor: nuevoEstado ? '#059669' : '#64748b',
+                customClass: { popup: 'rounded-[32px] shadow-2xl', confirmButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase', cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase' }
+            }).then(r => { if (r.isConfirmed) window.comboController.toggleActivoMasivo(ids, nuevoEstado); });
+        }
+    },
 
     mostrarTabla(combos = [], columnasVisibles = []) {
         const contenedor = document.getElementById('content-area');
         if (!contenedor) return;
         const cols = columnasVisibles.length > 0 ? columnasVisibles :
             ['nro', 'nombre', 'precio_descuento', 'alcance', 'vigencia', 'estado', 'acciones'];
-        contenedor.innerHTML = this._renderTabla(combos, cols);
+        window._combosPaginados = combos;
+        contenedor.innerHTML = this._renderTabla(combos, cols) + this._renderBarraFlotante();
         this._bindBuscador(combos, cols);
+        setTimeout(() => {
+            selectorUtil.sincronizarChecks();
+            this._actualizarBarraFlotante(selectorUtil.estado.seleccionados.length);
+        }, 0);
     },
     _renderTabla(combos, cols = []) {
         return `
@@ -59,6 +169,11 @@ export const comboView = {
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-slate-100 bg-slate-50">
+                            <th class="px-4 py-3 w-10 text-center">
+                                <input type="checkbox" id="check-all-combo"
+                                       class="w-4 h-4 rounded accent-orange-500 cursor-pointer"
+                                       onchange="comboView.toggleLoteTodos(window._combosPaginados)">
+                            </th>
                             ${cols.includes('nro') ? `<th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">N°</th>` : ''}
                             ${cols.includes('nombre') ? `<th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Combo</th>` : ''}
                             ${cols.includes('precio_descuento') ? `<th class="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Precio / Descuento</th>` : ''}
@@ -91,6 +206,7 @@ export const comboView = {
     },
 
     _renderFila(c, numero, cols = []) {
+        const isChecked = selectorUtil.estado.seleccionados.includes(String(c.id)) ? 'checked' : '';
         const estado = this._calcularEstado(c);
         const badgeEst = this._badgeEstado(estado);
         const esPrecioFijo = c.precio_fijo !== null && c.precio_fijo !== undefined;
@@ -116,7 +232,13 @@ export const comboView = {
         const ff = c.fecha_fin ? new Date(c.fecha_fin).toLocaleDateString('es-BO') : '—';
 
         return `
-    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-all group" data-id="${c.id}">
+    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-all group ${isChecked ? 'bg-blue-50/70' : ''}" data-id="${c.id}">
+        <td class="px-4 py-3 text-center">
+            <input type="checkbox" ${isChecked}
+                   class="fila-checkbox-combo w-4 h-4 rounded accent-orange-500 cursor-pointer"
+                   data-id="${c.id}"
+                   onchange="comboView.toggleLote('${c.id}')">
+        </td>
         ${cols.includes('nro') ? `
         <td class="px-4 py-3">
             <span class="text-slate-400 font-bold text-xs">${numero}</span>

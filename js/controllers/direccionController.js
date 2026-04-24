@@ -3,6 +3,7 @@ import { direccionView } from '../views/direccionView.js';
 import { direccionFormView } from '../views/direccionFormView.js';
 import { configuracionColumnasController } from './configuracionColumnasController.js';
 import { usuarioModel } from '../models/usuarioModel.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const direccionController = {
     _datosCache: [],
@@ -10,6 +11,7 @@ export const direccionController = {
 
     async inicializar(silencioso = false) {
         try {
+            if (!silencioso) selectorUtil.limpiar();
             if (!silencioso) direccionView.mostrarCargando('Cargando direcciones...');
 
             const usuario = await usuarioModel.obtenerUsuarioActual();
@@ -205,6 +207,21 @@ export const direccionController = {
     },
     refrescarVista() {
         direccionView.render(this._datosCache, this._columnasVisibles);
+    },
+
+    async eliminarMasivo(ids) {
+        direccionView.mostrarCargando('Eliminando direcciones...');
+        try {
+            for (const id of ids) {
+                await direccionModel.delete(id);
+            }
+            direccionView.limpiarSeleccion();
+            await this.inicializar(true);
+            direccionView.notificarExito(`${ids.length} direcciones eliminadas correctamente.`);
+        } catch (error) {
+            console.error(error);
+            direccionView.notificarError('Error al eliminar algunas direcciones.');
+        }
     },
 };
 

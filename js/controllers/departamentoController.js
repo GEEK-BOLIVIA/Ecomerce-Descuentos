@@ -3,6 +3,7 @@ import { departamentoView } from '../views/departamentoView.js';
 import { departamentoFormView } from '../views/departamentoFormView.js';
 import { configuracionColumnasController } from './configuracionColumnasController.js';
 import { usuarioModel } from '../models/usuarioModel.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const departamentoController = {
     _datosCache: [],
@@ -10,6 +11,7 @@ export const departamentoController = {
 
     async inicializar(silencioso = false) {
         try {
+            if (!silencioso) selectorUtil.limpiar();
             if (!silencioso) departamentoView.mostrarCargando('Cargando departamentos...');
 
             const usuario = await usuarioModel.obtenerUsuarioActual();
@@ -144,6 +146,21 @@ export const departamentoController = {
 
     refrescarVista() {
         departamentoView.render(this._datosCache, this._columnasVisibles);
+    },
+
+    async eliminarMasivo(ids) {
+        departamentoView.mostrarCargando('Eliminando departamentos...');
+        try {
+            for (const id of ids) {
+                await departamentoModel.delete(id);
+            }
+            departamentoView.limpiarSeleccion();
+            await this.inicializar(true);
+            departamentoView.notificarExito(`${ids.length} departamentos eliminados correctamente.`);
+        } catch (error) {
+            console.error(error);
+            departamentoView.notificarError('Error al eliminar algunos departamentos.');
+        }
     },
 };
 

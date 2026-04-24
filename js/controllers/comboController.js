@@ -3,6 +3,7 @@ import { comboView } from '../views/comboView.js';
 import { comboFormView } from '../views/comboFormView.js';
 import { configuracionColumnasController } from './configuracionColumnasController.js';
 import { usuarioModel } from '../models/usuarioModel.js';
+import { selectorUtil } from '../utils/selectorUtil.js';
 
 export const comboController = {
 
@@ -10,6 +11,7 @@ export const comboController = {
     _columnasVisibles: [],
 
     async inicializar(silencioso = false) {
+        if (!silencioso) selectorUtil.limpiar();
         if (!silencioso) comboView.mostrarCargando('Cargando combos...');
         try {
             const usuario = await usuarioModel.obtenerUsuarioActual();
@@ -32,6 +34,38 @@ export const comboController = {
     },
     refrescarVista() {
         comboView.mostrarTabla(this._datosCache, this._columnasVisibles);
+    },
+
+    async eliminarMasivo(ids) {
+        comboView.mostrarCargando('Eliminando combos...');
+        try {
+            for (const id of ids) {
+                await comboModel.delete(id);
+            }
+            comboView.limpiarSeleccion();
+            await this.inicializar(true);
+            comboView.notificarExito(`${ids.length} combos eliminados correctamente.`);
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            comboView.notificarError('Error al eliminar algunos combos.');
+        }
+    },
+
+    async toggleActivoMasivo(ids, nuevoEstado) {
+        comboView.mostrarCargando(nuevoEstado ? 'Activando combos...' : 'Desactivando combos...');
+        try {
+            for (const id of ids) {
+                await comboModel.toggleActivo(id, nuevoEstado);
+            }
+            comboView.limpiarSeleccion();
+            await this.inicializar(true);
+            comboView.notificarExito(`${ids.length} combos ${nuevoEstado ? 'activados' : 'desactivados'} correctamente.`);
+        } catch (error) {
+            console.error(error);
+            Swal.close();
+            comboView.notificarError('Error al cambiar el estado de algunos combos.');
+        }
     },
     // ─────────────────────────────────────────────
     // CREAR

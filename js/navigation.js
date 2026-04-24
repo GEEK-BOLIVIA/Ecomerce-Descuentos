@@ -7,6 +7,7 @@ import { departamentoController } from './controllers/departamentoController.js'
 import { direccionController } from './controllers/direccionController.js';
 import { descuentoController } from './controllers/descuentoController.js';
 import { comboController } from './controllers/comboController.js';
+import { dashboardController } from './controllers/dashboardController.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -261,6 +262,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (id === 'link-productos') await productoController.inicializar();
                 if (id === 'link-categorias') await categoriasController.inicializar();
             }
+            else if (id === 'link-dashboard') {
+                actualizarEstadoActivo(item);
+                await dashboardController.inicializar();
+            }
             // Caso C: Es una página estática o con AJAX simple
             else if (viewUrl) {
                 await cargarSeccion(viewUrl, 'ajax', item);
@@ -345,3 +350,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 window.usuarioController = usuarioController;
+window.dashboardController = dashboardController;

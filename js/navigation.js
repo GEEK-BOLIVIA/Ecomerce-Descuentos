@@ -8,6 +8,7 @@ import { direccionController } from './controllers/direccionController.js';
 import { descuentoController } from './controllers/descuentoController.js';
 import { comboController } from './controllers/comboController.js';
 import { dashboardController } from './controllers/dashboardController.js';
+import { metodoPagoController } from './controllers/metodoPagoController.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -123,6 +124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.productoController = productoController;
     window.importacionController = importacionController;
     window.descuentoController = descuentoController;
+    window.metodoPagoController = metodoPagoController;
 
     const navItems = document.querySelectorAll('.nav-item');
     const contentArea = document.getElementById('content-area');

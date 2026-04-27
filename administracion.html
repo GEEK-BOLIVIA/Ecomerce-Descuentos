@@ -332,6 +332,16 @@
                             </button>
                         </div>
                     </details>
+                    <details class="group px-1">
+                        <summary
+                            class="flex items-center justify-between rounded-lg px-3 py-2.5 text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all cursor-pointer list-none">
+                            <div onclick="event.preventDefault(); metodoPagoController.inicializar()"
+                                class="flex items-center gap-3 flex-1 cursor-pointer">
+                                <span class="material-symbols-outlined text-[20px]">payments</span>
+                                <p class="text-sm font-medium sidebar-hide">Métodos de Pago</p>
+                            </div>
+                        </summary>
+                    </details>
                 </div>
                 <div class="flex flex-col gap-1">
                     <p class="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 sidebar-hide">
@@ -408,6 +418,7 @@
     <script type="module" src="js/controllers/carruselController.js"></script>
     <script type="module" src="js/controllers/sucursalController.js"></script>
     <script type="module" src="js/controllers/paletaColorController.js"></script>
+    <script type="module" src="js/controllers/metodoPagoController.js"></script>
 
 </body>
 

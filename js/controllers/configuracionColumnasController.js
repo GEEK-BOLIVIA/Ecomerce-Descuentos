@@ -19,7 +19,8 @@ export const configuracionColumnasController = {
         direcciones: ['nro', 'cliente', 'etiqueta', 'direccion', 'referencia', 'mapa', 'acciones'],
         descuentos: ['nro', 'nombre', 'valor', 'alcance', 'vigencia', 'estado', 'acciones'],
         combos: ['nro', 'nombre', 'precio_descuento', 'alcance', 'vigencia', 'estado', 'acciones'],
-        carruseles: ['nro', 'nombre', 'ubicacion', 'tipo', 'acciones']
+        carruseles: ['nro', 'nombre', 'ubicacion', 'tipo', 'acciones'],
+        metodos_pago: ['nro', 'nombre', 'slug', 'requiere_referencia', 'activo', 'acciones']
     },
     // --- Agregar esto dentro de configuracionColumnasController ---
 

@@ -24,6 +24,13 @@ export const RegisterCarrusel = {
         window.RegisterCarrusel = this;
 
         this.updateUI();
+
+        // Solo para carruseles nuevos: calcular orden automático con el slug por defecto
+        if (!this._isEdit) {
+            const slugInicial = carruselState.config.ubicacion_slug || 'home-top';
+            await this.actualizarOrdenAutomatico(slugInicial);
+        }
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
@@ -81,17 +88,19 @@ export const RegisterCarrusel = {
     },
     
     cerrarYRefrescar() {
-        // 1. Quitar el formulario y restaurar el contenedor de la tabla
         if (this._container && this._originalContent) {
             this._container.innerHTML = this._originalContent;
         }
+        // Limpiar referencias
+        this._container = null;
+        this._originalContent = null;
 
-        // 2. Ejecutar el refresco de datos
+        // Limpiar selección antes de re-renderizar
         if (window.carruselController_View) {
-            window.carruselController_View.render();
+            window.carruselController_View._estado.seleccionados = [];
         }
 
-        // 3. Hacer scroll hacia arriba para que el usuario vea la tabla
+        if (window.carruselController_View) window.carruselController_View.render();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
@@ -131,17 +140,8 @@ export const RegisterCarrusel = {
         // En lugar de llamar a una función externa que falla, ejecutamos la limpieza aquí
         this.limpiarFormularioItem();
 
-        // Feedback visual para el usuario
-        const toast = Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 2000
-        });
-        toast.fire({
-            icon: 'success',
-            title: 'Cambios aplicados en la lista'
-        });
+        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 })
+            .fire({ icon: 'success', title: 'Ítem añadido' });
     },
 
     /**
@@ -151,13 +151,7 @@ export const RegisterCarrusel = {
     limpiarFormularioItem() {
         const state = window.carruselState;
         const formContainer = document.getElementById('form_item_container');
-
-        if (formContainer && typeof carruselTemplates.renderFormItem === 'function') {
-            // Re-renderizamos el formulario en modo "nuevo" (null)
-            formContainer.innerHTML = carruselTemplates.renderFormItem(state.config.tipo, null);
-        }
-
-        // Aseguramos que el buscador esté vacío
+        if (formContainer) formContainer.innerHTML = carruselTemplates.renderFormItem(state.config.tipo, null);
         const searchInput = document.getElementById('it_search');
         if (searchInput) searchInput.value = '';
     },
@@ -180,8 +174,9 @@ export const RegisterCarrusel = {
         // 2. Priorización de Media: Icono > Imagen Manual > Preview
         // Esto asegura que si hay un icono guardado, se cargue eso en el selector
         const valorMedia = item.icono_manual || item.imagen_url_manual || item.imagen_preview || '';
-        const valorTitulo = item.titulo_manual || item.titulo || 'Sin título';
-        const valorSubtitulo = item.subtitulo_manual || item.subtitulo || '';
+        // ?? en lugar de || para respetar cadena vacía
+        const valorTitulo = item.titulo_manual ?? item.titulo ?? '';
+        const valorSubtitulo = item.subtitulo_manual ?? item.subtitulo ?? '';
         const valorLink = item.link_destino_manual || item.link || '';
 
         // 3. Preparamos el objeto "mapeado" para que el Template renderice correctamente
@@ -214,7 +209,6 @@ export const RegisterCarrusel = {
             // Preservamos el ID de relación (producto_id o categoria_id)
             if (elRelacion) elRelacion.value = item.relacion_id || item.producto_id || item.categoria_id || '';
 
-            // Si existe buscador (tipo productos/categorías), sincronizamos el texto de búsqueda
             const elSearch = document.getElementById('it_search');
             if (elSearch) elSearch.value = valorTitulo;
 
@@ -277,24 +271,13 @@ export const RegisterCarrusel = {
     cancelarEdicion() {
         if (carruselState.items.length > 0) {
             Swal.fire({
-                title: '¿Salir del editor?',
-                text: "Se perderán los cambios que no hayas guardado.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#0f172a',
-                confirmButtonText: 'Sí, salir',
-                cancelButtonText: 'Seguir aquí'
-            }).then((result) => {
-                if (result.isConfirmed) this.cerrarYRefrescar();
-            });
+                title: '¿Salir del editor?', text: "Se perderán los cambios sin guardar.",
+                icon: 'warning', showCancelButton: true,
+                confirmButtonColor: '#0f172a', confirmButtonText: 'Sí, salir', cancelButtonText: 'Seguir aquí'
+            }).then(result => { if (result.isConfirmed) this.cerrarYRefrescar(); });
         } else {
             this.cerrarYRefrescar();
         }
-    },
-
-    cerrarYRefrescar() {
-        this._container.innerHTML = this._originalContent;
-        if (window.CarruselList) window.CarruselList.init();
     }
 };
 

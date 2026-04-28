@@ -37,47 +37,46 @@ export const carruselState = {
 
             if (datosExistentes.items && Array.isArray(datosExistentes.items)) {
                 this.items = datosExistentes.items.map(item => {
-                    const esCategoria = !!item.categoria_id;
                     const dataProducto = item.producto || {};
                     const dataCategoria = item.categoria || {};
+                    const esCategoria = !!item.categoria_id;
 
-                    // Normalizamos los IDs a Números
                     const pId = item.producto_id ? parseInt(item.producto_id) : null;
                     const cId = item.categoria_id ? parseInt(item.categoria_id) : null;
 
-                    // --- LÓGICA DE IMAGEN / ICONO CORREGIDA ---
                     let imagenFinal = '';
-
-                    // 1. Prioridad: ¿Hay un icono de FontAwesome guardado manualmente? (Caso categorías)
                     if (item.icono_manual && item.icono_manual.trim() !== '') {
                         imagenFinal = item.icono_manual;
-                    }
-                    // 2. ¿Hay una URL de imagen guardada manualmente? (Caso banners/productos)
-                    else if (item.imagen_url_manual && item.imagen_url_manual.trim() !== '') {
+                    } else if (item.imagen_url_manual && item.imagen_url_manual.trim() !== '') {
                         imagenFinal = item.imagen_url_manual;
-                    }
-                    // 3. Si es producto y no hay manual, usamos la imagen original del producto
-                    else if (dataProducto.imagen_url) {
+                    } else if (dataProducto.imagen_url) {
                         imagenFinal = dataProducto.imagen_url;
-                    }
-                    // 4. Si es categoría pero no tiene icono manual, ponemos el de backup
-                    else if (esCategoria) {
+                    } else if (esCategoria) {
                         imagenFinal = 'fa-solid fa-layer-group';
-                    }
-                    // 5. Fallback total
-                    else {
+                    } else {
                         imagenFinal = 'https://placehold.co/400x300?text=Sin+Imagen';
                     }
 
+                    // Título y subtítulo respetan el vacío — no se fuerza ningún valor
+                    const titulo = item.titulo_manual ?? '';
+                    const subtitulo = item.subtitulo_manual ?? '';
+
                     return {
                         imagen_preview: imagenFinal,
-                        titulo: item.titulo_manual || dataProducto.nombre || dataCategoria.nombre || 'Sin título',
-                        subtitulo: item.subtitulo_manual || (dataProducto.precio ? `Bs. ${dataProducto.precio}` : ''),
+                        titulo,
+                        subtitulo,
                         link: item.link_destino_manual || '',
                         relacion_id: pId || cId || null,
                         producto_id: pId,
                         categoria_id: cId,
-                        tipo_contenido: this.config.tipo
+                        tipo_contenido: this.config.tipo,
+                        // Preservar campos originales para el guardado
+                        titulo_manual: titulo,
+                        subtitulo_manual: subtitulo,
+                        imagen_url_manual: item.imagen_url_manual || null,
+                        icono_manual: item.icono_manual || null,
+                        link_destino_manual: item.link_destino_manual || null,
+                        id: item.id || null
                     };
                 });
             } else {

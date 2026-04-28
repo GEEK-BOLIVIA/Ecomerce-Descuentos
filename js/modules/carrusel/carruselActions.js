@@ -1,9 +1,11 @@
 import { carruselState } from './carruselState.js';
 import { RegisterCarrusel } from './registerCarrusel.js';
 
-// Variable para controlar el tiempo de espera de la búsqueda (Debounce)
 let searchTimer;
 let ICONOS_GLOBALES = [];
+
+// Mapa: base64 → File original (para subir al bucket al guardar)
+const _archivosLocales = new Map();
 
 /**
  * Carga la lista completa de iconos desde el repositorio de FontAwesome
@@ -319,30 +321,24 @@ export const carruselActions = {
         }
     },
 
-    /**
-     * Previsualización de archivos locales (Banners)
-     */
-    async previsualizarMediaLocal(input) {
-        if (input.files && input.files[0]) {
-            const file = input.files[0];
-            const reader = new FileReader();
-
-            reader.onload = (e) => {
-                const previewBox = document.getElementById('preview_box');
-                const mediaUrlInput = document.getElementById('it_media_url');
-
-                if (mediaUrlInput) mediaUrlInput.value = e.target.result;
-
-                if (previewBox) {
-                    if (file.type.startsWith('video/')) {
-                        previewBox.innerHTML = `<video src="${e.target.result}" class="w-full h-full object-cover" autoplay muted loop></video>`;
-                    } else {
-                        previewBox.innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover animate-fade-in">`;
-                    }
-                }
-            };
-            reader.readAsDataURL(file);
-        }
+    previsualizarMediaLocal(input) {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64 = e.target.result;
+            const previewBox = document.getElementById('preview_box');
+            const mediaUrlInput = document.getElementById('it_media_url');
+            // Guardar File real para subir al bucket
+            _archivosLocales.set(base64, file);
+            if (mediaUrlInput) mediaUrlInput.value = base64;
+            if (previewBox) {
+                previewBox.innerHTML = file.type.startsWith('video/')
+                    ? `<video src="${base64}" class="w-full h-full object-cover" autoplay muted loop></video>`
+                    : `<img src="${base64}" class="w-full h-full object-cover animate-fade-in">`;
+            }
+        };
+        reader.readAsDataURL(file);
     },
 
     async pedirUrlImagen() {
@@ -390,31 +386,24 @@ export const carruselActions = {
             return null;
         }
 
+        const esBase64 = mediaUrl.startsWith('data:');
+        const esIcono = mediaUrl.startsWith('fa-');
+        const archivoLocal = esBase64 ? (_archivosLocales.get(mediaUrl) || null) : null;
+
         // 3. Construcción del Objeto compatible con TU Base de Datos
         const itemFinal = {
-            // --- PARA EL FRONTEND (Uso en templates y previews) ---
             imagen_preview: mediaUrl,
             titulo: titulo,
             subtitulo: subtitulo,
             link: link,
             relacion_id: relacionId,
             tipo_contenido: tipoActual,
-
-            // --- PARA TU BASE DE DATOS (Mapeo a columnas reales) ---
-            titulo_manual: titulo,
-            subtitulo_manual: subtitulo,
-            link_destino_manual: link,
-
-            /**
-             * LÓGICA DE GUARDADO CRÍTICA:
-             * Si el usuario eligió un icono (fa-...) lo guardamos en 'icono_manual'
-             * si eligió una URL, lo guardamos en 'imagen_url_manual'.
-             * Según tu requerimiento, nos aseguramos de que 'imagen_url_manual' no quede vacío si es icono.
-             */
-            imagen_url_manual: mediaUrl.startsWith('fa-') ? null : mediaUrl,
-            icono_manual: mediaUrl.startsWith('fa-') ? mediaUrl : null,
-
-            // IDs específicos para las relaciones de Supabase
+            _archivoLocal: archivoLocal,
+            titulo_manual: titulo !== '' ? titulo : null,
+            subtitulo_manual: subtitulo !== '' ? subtitulo : null,
+            link_destino_manual: link !== '' ? link : null,
+            imagen_url_manual: esIcono ? null : (esBase64 ? null : (mediaUrl || null)),
+            icono_manual: esIcono ? mediaUrl : null,
             producto_id: tipoActual === 'productos' ? (relacionId ? parseInt(relacionId) : null) : null,
             categoria_id: tipoActual === 'categorias' ? (relacionId ? parseInt(relacionId) : null) : null,
         };
@@ -558,14 +547,19 @@ export const carruselActions = {
         contenedor.innerHTML = carruselState.items.map((item, index) => `
             <div class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl mb-2 shadow-sm group">
                 <div class="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                    ${item.imagen_preview.startsWith('fa-')
-                ? `<i class="${item.imagen_preview} text-blue-500"></i>`
+                    ${item.imagen_preview?.startsWith('fa-')
+                ? `<i class="${item.imagen_preview} text-blue-500 text-xl"></i>`
                 : `<img src="${item.imagen_preview}" class="w-full h-full object-cover">`
             }
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-[10px] font-black text-slate-700 uppercase truncate">${item.titulo}</p>
-                    <p class="text-[9px] text-slate-400 truncate">${item.subtitulo || 'Sin subtítulo'}</p>
+                    <p class="text-[10px] font-black uppercase truncate ${item.titulo ? 'text-slate-700' : 'text-slate-300 italic'}">
+                        ${item.titulo || 'Sin título'}
+                    </p>
+                    <p class="text-[9px] text-slate-400 truncate">${item.subtitulo || ''}</p>
+                    ${item._archivoLocal instanceof File
+                ? `<p class="text-[8px] text-amber-500 font-bold flex items-center gap-1 mt-0.5"><i class="fa-solid fa-cloud-arrow-up"></i> Pendiente de subir</p>`
+                : ''}
                 </div>
                 <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onclick="carruselActions.editarItem(${index})" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg">
@@ -575,11 +569,14 @@ export const carruselActions = {
                         <i class="fa-solid fa-trash text-xs"></i>
                     </button>
                 </div>
-            </div>
-        `).join('');
+            </div>`).join('');
     },
 
     eliminarItem(index) {
+        const item = carruselState.items[index];
+        if (item?._archivoLocal instanceof File || item?.imagen_preview?.startsWith('data:')) {
+            _archivosLocales.delete(item.imagen_preview);
+        }
         carruselState.items.splice(index, 1);
         this.renderItems();
     },
@@ -602,115 +599,165 @@ export const carruselActions = {
             console.error("No se encontró el input #it_media_url para asignar el icono");
         }
     },
-    /**
-     * Orquestador final de guardado
-     */
+    // ─── COMPRESIÓN DE IMAGEN ────────────────────────────────────────
+    async _comprimirImagen(file, maxWidth = 1280, quality = 0.82) {
+        if (!file.type.startsWith('image/')) return file;
+        return new Promise((resolve) => {
+            const img = new Image();
+            const objUrl = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(objUrl);
+                let { width, height } = img;
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob) { resolve(file); return; }
+                        resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                    },
+                    'image/jpeg',
+                    quality
+                );
+            };
+            img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(file); };
+            img.src = objUrl;
+        });
+    },
+
+    // ─── ENVIAR AL SERVIDOR ──────────────────────────────────────────
     async enviarAlServidor() {
         const state = window.carruselState;
-        // Aseguramos obtener la lista de ítems correctamente
         const listaItems = Array.isArray(state.items) ? state.items : (state.items?.items || []);
 
         if (!state || listaItems.length === 0) {
-            Swal.fire({
-                title: "Lista vacía",
-                text: "Agrega al menos un ítem antes de publicar.",
-                icon: "warning",
-                customClass: { popup: 'rounded-[2rem]' }
-            });
+            Swal.fire({ title: "Lista vacía", text: "Agrega al menos un ítem antes de publicar.", icon: "warning", customClass: { popup: 'rounded-[2rem]' } });
             return;
         }
 
-        // Usamos el nombre del estado para la confirmación
         const nombreCarrusel = state.config.nombre || "nuevo carrusel";
+        const itemsConArchivo = listaItems.filter(i => i._archivoLocal instanceof File);
+        const totalSubidas = itemsConArchivo.length;
 
         const result = await Swal.fire({
             title: `¿Publicar "${nombreCarrusel}"?`,
-            text: "La configuración y los ítems se actualizarán en la base de datos.",
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Sí, publicar ahora',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#2563eb',
-            customClass: { popup: 'rounded-[2rem]' }
+            text: totalSubidas > 0
+                ? `Se subirán ${totalSubidas} imagen${totalSubidas > 1 ? 'es' : ''} al servidor.`
+                : "La configuración y los ítems se actualizarán en la base de datos.",
+            icon: 'question', showCancelButton: true,
+            confirmButtonText: 'Sí, publicar', cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#2563eb', customClass: { popup: 'rounded-[2rem]' }
         });
 
         if (!result.isConfirmed) return;
 
         Swal.fire({
-            title: 'Guardando...',
-            html: 'Sincronizando con el servidor',
-            didOpen: () => { Swal.showLoading(); },
-            allowOutsideClick: false,
-            customClass: { popup: 'rounded-[2rem]' }
+            title: '<span class="text-slate-800 font-black uppercase text-sm">Publicando...</span>',
+            html: `
+                <div class="space-y-3 py-2">
+                    <div class="flex items-center gap-3 text-sm text-slate-600">
+                        <span id="swal-step-1" class="material-symbols-outlined text-slate-300 text-lg">radio_button_unchecked</span>
+                        ${totalSubidas > 0 ? `Subiendo ${totalSubidas} archivo${totalSubidas > 1 ? 's' : ''}` : 'Preparando datos'}
+                    </div>
+                    <div class="flex items-center gap-3 text-sm text-slate-600">
+                        <span id="swal-step-2" class="material-symbols-outlined text-slate-300 text-lg">radio_button_unchecked</span>
+                        Guardando configuración
+                    </div>
+                    <div class="flex items-center gap-3 text-sm text-slate-600">
+                        <span id="swal-step-3" class="material-symbols-outlined text-slate-300 text-lg">radio_button_unchecked</span>
+                        Vinculando ítems
+                    </div>
+                </div>`,
+            showConfirmButton: false, allowOutsideClick: false,
+            customClass: { popup: 'rounded-[32px] shadow-2xl' }
         });
+
+        const setStep = (n, ok = true) => {
+            const el = document.getElementById(`swal-step-${n}`);
+            if (el) {
+                el.innerText = ok ? 'check_circle' : 'error';
+                el.className = `material-symbols-outlined text-lg ${ok ? 'text-emerald-500' : 'text-red-500'}`;
+            }
+        };
 
         try {
             const ctrl = window.carruselController;
             if (!ctrl) throw new Error("El controlador no está inicializado");
+            if (!window.productoController?._uploadToSupabase) throw new Error("productoController._uploadToSupabase no disponible");
 
-            // 1. Guardar o Actualizar la CABECERA
-            // Usamos state._id para saber si es edición o creación
-            const resConfig = await ctrl.guardarConfiguracion(state.config, state._id);
+            // PASO 1 + 2 EN PARALELO: subir archivos y guardar cabecera al mismo tiempo
+            const [, resConfig] = await Promise.all([
+                Promise.all(listaItems.map(async (item) => {
+                    if (!(item._archivoLocal instanceof File)) return;
+                    const comprimido = await this._comprimirImagen(item._archivoLocal);
+                    const urlBucket = await window.productoController._uploadToSupabase(
+                        comprimido, 'carrusel', state.config.nombre || 'carrusel'
+                    );
+                    const base64Anterior = item.imagen_preview;
+                    item.imagen_preview = urlBucket;
+                    item.imagen_url_manual = urlBucket;
+                    item._archivoLocal = null;
+                    _archivosLocales.delete(base64Anterior);
+                })),
+                ctrl.guardarConfiguracion(state.config, state._id)
+            ]);
+
             if (!resConfig.exito) throw new Error(resConfig.mensaje);
-
             const carruselId = resConfig.id;
+            setStep(1);
+            setStep(2);
 
-            // 2. Limpiar ítems antiguos para evitar duplicados
+            // PASO 3: Limpiar e insertar ítems en paralelo
             await ctrl.limpiarItemsCarrusel(carruselId);
 
-            // 3. Vincular los nuevos ítems uno a uno
-            for (let i = 0; i < listaItems.length; i++) {
-                const item = listaItems[i];
-                const medioVisual = item.imagen_preview || item.imagen_url_manual || item.icono_manual || null;
+            const resultados = await Promise.all(
+                listaItems.map((item, i) => {
+                    const medioVisual = item.imagen_url_manual || item.imagen_preview || item.icono_manual || null;
+                    const mediaFinal = medioVisual?.startsWith('data:') ? null : medioVisual;
 
-                const payload = {
-                    carrusel_id: carruselId,
-                    orden: i,
-                    titulo_manual: item.titulo_manual || item.titulo || null,
-                    subtitulo_manual: item.subtitulo_manual || item.subtitulo || null,
-                    imagen_url_manual: medioVisual,
-                    link_destino_manual: item.link_destino_manual || item.link || null,
-                    producto_id: item.producto_id || null,
-                    categoria_id: item.categoria_id || null
-                };
+                    const payload = {
+                        carrusel_id: carruselId,
+                        orden: i,
+                        titulo_manual: item.titulo_manual || null,
+                        subtitulo_manual: item.subtitulo_manual || null,
+                        imagen_url_manual: mediaFinal,
+                        link_destino_manual: item.link_destino_manual || item.link || null,
+                        producto_id: item.producto_id || null,
+                        categoria_id: item.categoria_id || null
+                    };
+                    if (payload.titulo_manual === '') payload.titulo_manual = null;
+                    if (payload.subtitulo_manual === '') payload.subtitulo_manual = null;
 
-                const resItem = await ctrl.vincularItemSinRefrescar(payload);
-                if (resItem && resItem.exito === false) {
-                    throw new Error(`Error en ítem ${i}: ${resItem.mensaje}`);
-                }
-            }
+                    return ctrl.vincularItemSinRefrescar(payload);
+                })
+            );
 
-            // 4. Feedback de éxito con cierre automático
-            await Swal.fire({
-                icon: 'success',
-                title: '¡Publicado con éxito!',
-                text: `El carrusel "${nombreCarrusel}" ha sido actualizado.`,
-                timer: 2000,
-                showConfirmButton: false,
+            const errores = resultados.filter(r => r?.exito === false);
+            if (errores.length > 0) throw new Error(`Error en ${errores.length} ítem(s): ${errores[0]?.mensaje}`);
+
+            setStep(3);
+            await new Promise(r => setTimeout(r, 300));
+            Swal.close();
+
+            Swal.fire({
+                icon: 'success', title: '¡Publicado!',
+                text: `"${nombreCarrusel}" actualizado correctamente.`,
+                timer: 2000, showConfirmButton: false,
                 customClass: { popup: 'rounded-[2rem]' }
             });
 
-            // 5. FINALIZACIÓN Y REFRESCO DE TABLA
-            // Llamamos al render de la vista antes de cerrar para que los datos estén listos
-            if (window.carruselController_View) {
-                window.carruselController_View.render();
-            }
-
-            if (window.RegisterCarrusel && typeof window.RegisterCarrusel.cerrarYRefrescar === 'function') {
-                window.RegisterCarrusel.cerrarYRefrescar();
-            } else {
-                // Si el componente de registro no tiene el método, forzamos recarga como último recurso
-                location.reload();
-            }
+            if (window.carruselController_View) window.carruselController_View.render();
+            if (window.RegisterCarrusel?.cerrarYRefrescar) window.RegisterCarrusel.cerrarYRefrescar();
+            else location.reload();
 
         } catch (error) {
-            console.error("Error crítico en el guardado:", error);
-            Swal.fire({
-                title: "Fallo en el guardado",
-                text: "Detalle: " + error.message,
-                icon: "error",
-                customClass: { popup: 'rounded-[2rem]' }
-            });
+            console.error("Error crítico:", error);
+            Swal.fire({ title: "Fallo en el guardado", text: error.message, icon: "error", customClass: { popup: 'rounded-[2rem]' } });
         }
     }
 };

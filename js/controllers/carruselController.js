@@ -279,21 +279,19 @@ export const carruselController = {
 
 
     async vincularItemSinRefrescar(dataItem) {
-        // Mapeamos los campos del frontend a los nombres de columna de la DB
         const payloadDB = {
             carrusel_id: dataItem.carrusel_id,
             orden: dataItem.orden,
-            titulo_manual: dataItem.titulo_manual,
-            subtitulo_manual: dataItem.subtitulo_manual,
-            // Prioridad: Si viene icono_manual lo usamos, si no, lo extraemos de imagen_preview si es fa-
-            icono_manual: dataItem.icono_manual || (dataItem.imagen_preview?.startsWith('fa-') ? dataItem.imagen_preview : null),
-            imagen_url_manual: dataItem.imagen_url_manual || (!dataItem.imagen_preview?.startsWith('fa-') ? dataItem.imagen_preview : null),
-            link_destino_manual: dataItem.link_destino_manual,
+            titulo_manual: dataItem.titulo_manual || null,
+            subtitulo_manual: dataItem.subtitulo_manual || null,
+            imagen_url_manual: dataItem.imagen_url_manual
+                || (dataItem.imagen_preview?.startsWith('fa-') ? dataItem.imagen_preview : null)
+                || dataItem.icono_manual
+                || null,
+            link_destino_manual: dataItem.link_destino_manual || null,
             producto_id: dataItem.producto_id || null,
-            categoria_id: dataItem.categoria_id || null,
-            activo: true
+            categoria_id: dataItem.categoria_id || null
         };
-
         return await carruselModel.agregarItem(payloadDB);
     }
 };

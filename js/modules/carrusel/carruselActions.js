@@ -1,5 +1,6 @@
 import { carruselState } from './carruselState.js';
 import { RegisterCarrusel } from './registerCarrusel.js';
+import { storageController } from '../../controllers/storageController.js';
 
 let searchTimer;
 let ICONOS_GLOBALES = [];
@@ -143,7 +144,7 @@ export const carruselActions = {
         const orden = ordenInput ? parseInt(ordenInput.value) : 0;
 
         if (!nombre) {
-            this._alertError("Ponle un nombre para identificarlo");
+            Swal.fire({ title: 'Campo requerido', text: 'Ponle un nombre para identificarlo', icon: 'warning', confirmButtonColor: '#0f172a', customClass: { popup: 'rounded-[2rem]' } });
             return false;
         }
 
@@ -380,9 +381,17 @@ export const carruselActions = {
 
         const tipoActual = carruselState.config.tipo;
 
-        // Validación básica: Banners necesitan imagen obligatoria
-        if (!mediaUrl && tipoActual === 'banners') {
-            Swal.fire("Error", "Los banners deben tener una imagen o contenido visual", "warning");
+        // Validación según tipo
+        if (tipoActual === 'banners' && !mediaUrl) {
+            Swal.fire({ title: 'Falta la imagen', text: 'Los banners deben tener una imagen o URL de contenido visual.', icon: 'warning', confirmButtonColor: '#0f172a', customClass: { popup: 'rounded-[2rem]' } });
+            return null;
+        }
+        if (tipoActual === 'productos' && !relacionId) {
+            Swal.fire({ title: 'Ningún producto seleccionado', text: 'Busca y selecciona un producto antes de añadir.', icon: 'warning', confirmButtonColor: '#0f172a', customClass: { popup: 'rounded-[2rem]' } });
+            return null;
+        }
+        if (tipoActual === 'categorias' && !relacionId) {
+            Swal.fire({ title: 'Ninguna categoría seleccionada', text: 'Busca y selecciona una categoría antes de añadir.', icon: 'warning', confirmButtonColor: '#0f172a', customClass: { popup: 'rounded-[2rem]' } });
             return null;
         }
 
@@ -688,28 +697,24 @@ export const carruselActions = {
         try {
             const ctrl = window.carruselController;
             if (!ctrl) throw new Error("El controlador no está inicializado");
-            if (!window.productoController?._uploadToSupabase) throw new Error("productoController._uploadToSupabase no disponible");
 
-            // PASO 1 + 2 EN PARALELO: subir archivos y guardar cabecera al mismo tiempo
-            const [, resConfig] = await Promise.all([
-                Promise.all(listaItems.map(async (item) => {
-                    if (!(item._archivoLocal instanceof File)) return;
-                    const comprimido = await this._comprimirImagen(item._archivoLocal);
-                    const urlBucket = await window.productoController._uploadToSupabase(
-                        comprimido, 'carrusel', state.config.nombre || 'carrusel'
-                    );
-                    const base64Anterior = item.imagen_preview;
-                    item.imagen_preview = urlBucket;
-                    item.imagen_url_manual = urlBucket;
-                    item._archivoLocal = null;
-                    _archivosLocales.delete(base64Anterior);
-                })),
-                ctrl.guardarConfiguracion(state.config, state._id)
-            ]);
+            // PASO 1: Subir archivos locales al bucket ANTES de guardar en BD
+            await Promise.all(listaItems.map(async (item) => {
+                if (!(item._archivoLocal instanceof File)) return;
+                const comprimido = await this._comprimirImagen(item._archivoLocal);
+                const urlBucket = await storageController.uploadCarruselImage(comprimido);
+                const base64Anterior = item.imagen_preview;
+                item.imagen_preview = urlBucket;
+                item.imagen_url_manual = urlBucket;
+                item._archivoLocal = null;
+                _archivosLocales.delete(base64Anterior);
+            }));
+            setStep(1);
 
+            // PASO 2: Guardar cabecera del carrusel
+            const resConfig = await ctrl.guardarConfiguracion(state.config, state._id);
             if (!resConfig.exito) throw new Error(resConfig.mensaje);
             const carruselId = resConfig.id;
-            setStep(1);
             setStep(2);
 
             // PASO 3: Limpiar e insertar ítems en paralelo

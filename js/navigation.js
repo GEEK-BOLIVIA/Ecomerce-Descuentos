@@ -1,4 +1,5 @@
 import { categoriasController } from './controllers/categoriasController.js';
+import { categoriasView } from './views/categoriasView.js';
 import { productoController } from './controllers/productoController.js';
 import { importacionController } from './controllers/importacionController.js';
 import { usuarioModel } from './models/usuarioModel.js';
@@ -69,15 +70,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         userAvatarImg.parentElement.classList.add('avatar-container');
     }
 
-    // --- 0.2 INICIALIZACIÓN AUTOMÁTICA DE PRODUCTOS ---
+    // --- 0.2 INICIALIZACIÓN AUTOMÁTICA DEL DASHBOARD ---
     try {
-        await productoController.inicializar();
-        // Buscar el summary padre del div de productos y activarlo
-        const divProductos = document.querySelector('#main-sidebar details summary div[onclick*="productoController.inicializar"]');
-        const summaryProductos = divProductos?.closest('summary');
-        if (summaryProductos) actualizarEstadoActivo(summaryProductos);
+        await dashboardController.inicializar();
+        const divDashboard = document.getElementById('link-dashboard');
+        if (divDashboard) actualizarEstadoActivo(divDashboard);
     } catch (error) {
-        console.error("Error al cargar productos iniciales:", error);
+        console.error("Error al cargar dashboard inicial:", error);
     }
     const mapeoRolesUsuarios = {
         'link-owners': 'owner',
@@ -262,7 +261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             else if (id === 'link-productos' || id === 'link-categorias') {
                 actualizarEstadoActivo(item);
                 if (id === 'link-productos') await productoController.inicializar();
-                if (id === 'link-categorias') await categoriasController.inicializar();
+                if (id === 'link-categorias') await categoriasController.inicializar(categoriasView._estado.pestanaActiva);
             }
             else if (id === 'link-dashboard') {
                 actualizarEstadoActivo(item);
@@ -350,6 +349,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const p = objetivo.querySelector('p');
         if (p) p.classList.add('font-bold');
     }
+
+    // Exponer para sincronización externa (ej: tabs de categorías)
+    window.actualizarEstadoActivo = actualizarEstadoActivo;
 });
 window.usuarioController = usuarioController;
 window.dashboardController = dashboardController;

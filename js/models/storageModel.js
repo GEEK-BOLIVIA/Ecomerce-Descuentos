@@ -10,7 +10,7 @@ export const storageModel = {
      */
     async subirArchivo(path, file) {
         const { data, error } = await supabase.storage
-            .from('almacenamiento')
+            .from('Almacenamiento')
             .upload(path, file, {
                 cacheControl: '3600',
                 upsert: true // Sobrescribe si el nombre ya existe
@@ -28,7 +28,7 @@ export const storageModel = {
      */
     obtenerUrlPublica(path) {
         const { data } = supabase.storage
-            .from('almacenamiento')
+            .from('Almacenamiento')
             .getPublicUrl(path);
         
         return data.publicUrl;
@@ -39,7 +39,7 @@ export const storageModel = {
      */
     async eliminarArchivo(path) {
         const { error } = await supabase.storage
-            .from('almacenamiento')
+            .from('Almacenamiento')
             .remove([path]);
         
         if (error) {

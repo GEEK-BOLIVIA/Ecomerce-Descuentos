@@ -4,55 +4,80 @@ import { productoModel } from '../models/productoModel.js';
 import { categoriasModel } from '../models/categoriasModel.js';
 import { productoCategoriaModel } from '../models/productoCategoriaModel.js';
 import { galeriaProductoModel } from '../models/galeriaProductoModel.js';
-import { aplicarEstiloCabecera } from '../utils/excelHelper.js'; // Ajusta la ruta según tu carpeta
+import { sucursalModel } from '../models/sucursalModel.js';
+import { sucursalProductoModel } from '../models/sucursalProductoModel.js';
+import { aplicarEstiloCabecera, aplicarEstiloCabeceraSucursal } from '../utils/excelHelper.js';
 
 export const importacionController = {
     datosValidados: [],
+    sucursales: [],
 
     async inicializar() {
         const contentArea = document.getElementById('content-area');
         if (!contentArea) return;
 
-        // 1. Renderizamos la interfaz
-        contentArea.innerHTML = importacionView.render();
+        this.sucursales = await sucursalModel.getAll();
 
-        // 2. Conectamos la Vista con el Controlador
+        contentArea.innerHTML = importacionView.render(this.sucursales);
+
         importacionView.initEventListeners(
-            (file) => this.validarArchivo(file),      // onValidate
-            () => this.iniciarCargaFinal(),           // onExecute
-            () => this.descargarPlantilla()           // onDownload (Aquí se vincula el botón)
+            (file) => this.validarArchivo(file),
+            () => this.iniciarCargaFinal(),
+            () => this.descargarPlantilla()
         );
     },
 
     descargarPlantilla() {
-        // 1. Definición de Datos
-        const encabezadosTecnicos = ["nombre", "descripcion", "precio", "stock", "subcategoria", "categoria_padre", "imagen_url", "habilitar_whatsapp", "imagenes_cant", "videos_cant"];
-        const encabezadosAmigables = ["Nombre del Producto", "Descripción", "Precio", "Stock", "Subcategoría", "Categoría Padre", "URL Imagen", "¿WhatsApp? (SI/NO)", "Cant. Fotos", "Cant. Videos"];
+        // Columnas fijas del producto
+        const colsTecnicas = ["nombre", "descripcion", "categoria", "subcategoria", "imagen_url", "habilitar_whatsapp"];
+        const colsAmigables = ["Nombre del Producto", "Descripción", "Categoría", "Subcategoría (opcional)", "URL Imagen", "¿WhatsApp? (SI/NO)"];
+
+        // Columnas dinámicas por sucursal: precio_NombreSucursal, stock_NombreSucursal
+        const colsSucTecnicas = [];
+        const colsSucAmigables = [];
+        this.sucursales.forEach(s => {
+            colsSucTecnicas.push(`precio_${s.nombre}`, `stock_${s.nombre}`);
+            colsSucAmigables.push(`Precio - ${s.nombre}`, `Stock - ${s.nombre}`);
+        });
+
+        const encabezadosTecnicos = [...colsTecnicas, ...colsSucTecnicas];
+        const encabezadosAmigables = [...colsAmigables, ...colsSucAmigables];
+
+        // Fila de ejemplo
+        const ejemploSucursales = [];
+        this.sucursales.forEach(() => { ejemploSucursales.push(100, 10); });
 
         const ejemplos = [
-            ["Ejemplo: Laptop Pro", "Potente laptop para diseño", 1200, 5, "Laptops", "Computación", "", "SI", 2, 1],
-            ["Ejemplo: Silla Gamer", "Ergonómica con soporte lumbar", 250, 15, "Muebles", "", "", "NO", 1, 0]
+            ["Laptop Pro", "Potente laptop para diseño", "Computación", "Laptops", "", "SI", ...ejemploSucursales],
+            ["Auriculares BT", "Inalámbricos con cancelación de ruido", "Electrónica", "", "", "NO", ...ejemploSucursales]
         ];
 
-        // 2. Creación de la Hoja (AOA = Array of Arrays)
+        // Nota explicativa en fila 4
+        const nota = [
+            "NOTA: Si el producto pertenece a una categoría sin subcategorías, llena solo 'Categoría' y deja 'Subcategoría' vacía.",
+            "", "", "", "", "", ...this.sucursales.flatMap(() => ["", ""])
+        ];
+
         const ws = XLSX.utils.aoa_to_sheet([
             encabezadosTecnicos,
             encabezadosAmigables,
-            ...ejemplos
+            ...ejemplos,
+            nota
         ]);
 
-        // 3. Configuración Estructural
-        ws['!rows'] = [{ hidden: true }]; // Oculta la Fila 1 (nombres técnicos)
-        ws['!cols'] = encabezadosTecnicos.map(() => ({ wch: 22 })); // Ancho de columnas
+        ws['!rows'] = [{ hidden: true }];
+        ws['!cols'] = encabezadosTecnicos.map((_, i) => ({ wch: i >= colsTecnicas.length ? 18 : 22 }));
 
-        // 4. Aplicación de Estilos mediante tu Helper
         const range = XLSX.utils.decode_range(ws['!ref']);
         aplicarEstiloCabecera(ws, range);
 
-        // 5. Generación del Archivo
+        // Resaltar columnas de sucursales en azul
+        const indicesSucursales = colsSucTecnicas.map((_, i) => colsTecnicas.length + i);
+        aplicarEstiloCabeceraSucursal(ws, indicesSucursales);
+
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Geek");
-        XLSX.writeFile(wb, "Plantilla_Importacion_Geek.xlsx");
+        XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Productos");
+        XLSX.writeFile(wb, "Plantilla_Importacion_Productos.xlsx");
     },
 
     async validarArchivo(file) {
@@ -61,89 +86,90 @@ export const importacionController = {
             const workbook = XLSX.read(data, { type: 'array' });
             const hoja = workbook.Sheets[workbook.SheetNames[0]];
 
-            /**
-             * CONFIGURACIÓN CLAVE:
-             * range: 2 -> Salta las filas 1 (técnica) y 2 (amigable). Empieza en la 3.
-             * header: [...] -> Mapea las columnas manualmente para que coincidan con tu lógica.
-             */
+            // Construir header dinámico igual que la plantilla
+            const colsFijas = ["nombre", "descripcion", "categoria", "subcategoria", "imagen_url", "habilitar_whatsapp"];
+            const colsSucursales = [];
+            this.sucursales.forEach(s => {
+                colsSucursales.push(`precio_${s.nombre}`, `stock_${s.nombre}`);
+            });
+            const headerCompleto = [...colsFijas, ...colsSucursales];
+
             const filas = XLSX.utils.sheet_to_json(hoja, {
                 range: 2,
-                header: [
-                    "nombre", "descripcion", "precio", "stock", "subcategoria",
-                    "categoria_padre", "imagen_url", "habilitar_whatsapp",
-                    "imagenes_cant", "videos_cant"
-                ],
-                defval: "" // Evita que los campos vacíos sean undefined
+                header: headerCompleto,
+                defval: ""
+            });
+
+            // Filtrar fila de nota si existe
+            const filasFiltradas = filas.filter(f => {
+                const nombre = f.nombre?.toString().trim();
+                return nombre && !nombre.startsWith('NOTA:');
             });
 
             const nombresExistentes = await importacionModel.obtenerNombresExistentes();
             const categoriasDB = await categoriasModel.obtenerTodas();
 
-            const reporte = {
-                validos: [],
-                errores: [],
-                totalFilas: filas.length
-            };
+            const reporte = { validos: [], errores: [], totalFilas: filasFiltradas.length };
 
-            filas.forEach((fila, index) => {
-                // Limpieza de datos básica
-                const nombre = fila.nombre ? fila.nombre.toString().trim() : "";
-                const subcatNom = fila.subcategoria ? fila.subcategoria.toString().trim() : "";
-                const padreNom = fila.categoria_padre ? fila.categoria_padre.toString().trim() : "";
-                const precioRaw = fila.precio ? fila.precio.toString().replace(',', '.') : "0";
-                const precio = parseFloat(precioRaw);
-                const stock = parseInt(fila.stock) || 0;
-
+            filasFiltradas.forEach((fila, index) => {
+                const nombre = fila.nombre?.toString().trim() || "";
+                const catNom = fila.categoria?.toString().trim() || "";
+                const subcatNom = fila.subcategoria?.toString().trim() || "";
+                const precio = parseFloat(fila.precio_base?.toString().replace(',', '.')) || 0;
                 let fallos = [];
 
-                // 1. Validación de Nombre y Duplicados
-                if (!nombre || nombre === "") {
-                    fallos.push("Falta el nombre del producto");
-                } else if (nombresExistentes.has(nombre.toLowerCase())) {
-                    fallos.push("Este producto ya existe en la base de datos");
-                }
+                if (!nombre) { fallos.push("Falta el nombre del producto"); }
+                else if (nombresExistentes.has(nombre.toLowerCase())) { fallos.push("Producto ya existe en la base de datos"); }
 
-                // 2. Validación de Precio
-                if (isNaN(precio) || precio <= 0) {
-                    fallos.push("El precio debe ser un número mayor a 0");
-                }
-
-                // 3. Validación de Categorías
-                if (!subcatNom) {
-                    fallos.push("Debe especificar una subcategoría");
+                if (!catNom) {
+                    fallos.push("Debe especificar al menos una Categoría");
                 } else {
-                    const subExiste = categoriasDB.some(c => c.nombre.toLowerCase() === subcatNom.toLowerCase());
-                    // Si la subcategoría es nueva y no tiene un padre asignado
-                    if (!subExiste && (!padreNom || padreNom === "")) {
-                        fallos.push(`La subcategoría '${subcatNom}' es nueva. Debe indicar una 'Categoría Padre' para crearla.`);
+                    // Determinar qué categoría se usará como vínculo
+                    const nombreVinculo = subcatNom || catNom;
+                    const categoriaVinculo = categoriasDB.find(c => c.nombre.toLowerCase() === nombreVinculo.toLowerCase());
+
+                    if (!categoriaVinculo) {
+                        // Es nueva: si tiene subcategoría, la categoría padre debe existir o se creará
+                        // Si no tiene subcategoría, se creará la categoría directamente
+                        if (subcatNom) {
+                            const padreExiste = categoriasDB.find(c => c.nombre.toLowerCase() === catNom.toLowerCase());
+                            if (!padreExiste) {
+                                fallos.push(`La categoría padre '${catNom}' no existe. Se creará automáticamente.`);
+                                // No es error bloqueante, solo informativo — no se agrega a fallos como error
+                                fallos.pop();
+                            }
+                        }
+                        // Categoría nueva sin subcategoría: se creará sola — OK
                     }
                 }
 
-                // --- CONSTRUCCIÓN DEL REPORTE ---
+                // Validar que al menos una sucursal tenga precio > 0
+                const sucursalesProducto = this.sucursales.map(s => ({
+                    id_sucursal: s.id,
+                    nombre: s.nombre,
+                    precio: parseFloat(fila[`precio_${s.nombre}`]?.toString().replace(',', '.')) || 0,
+                    stock: parseInt(fila[`stock_${s.nombre}`]) || 0
+                })).filter(s => s.precio > 0 || s.stock > 0);
+
+                if (sucursalesProducto.length === 0) {
+                    fallos.push("Debe asignar precio/stock en al menos una sucursal");
+                }
+
                 if (fallos.length > 0) {
-                    reporte.errores.push({
-                        fila: index + 3, // Fila real en el Excel
-                        nombre: nombre || "Producto sin nombre", // Esto es lo que lee tu View
-                        detalles: fallos // Array de strings que lee tu View
-                    });
+                    reporte.errores.push({ fila: index + 3, nombre: nombre || "Sin nombre", detalles: fallos });
                 } else {
-                    // Objeto limpio para la carga final
                     reporte.validos.push({
                         nombre,
                         descripcion: fila.descripcion || "",
-                        precio,
-                        stock,
-                        subcategoria: subcatNom,
-                        categoria_padre: padreNom || null,
+                        categoria: catNom,
+                        subcategoria: subcatNom || null,
                         portada: fila.imagen_url || 'https://via.placeholder.com/600x400?text=Sin+Portada',
                         whatsapp: fila.habilitar_whatsapp?.toString().toUpperCase() === 'SI',
-                        imagenes_cant: parseInt(fila.imagenes_cant) || 0,
-                        videos_cant: parseInt(fila.videos_cant) || 0
+                        sucursales: sucursalesProducto
                     });
                 }
             });
 
-            // Guardamos en el controlador para la ejecución final
             this.datosValidados = reporte.validos;
             return reporte;
 
@@ -152,18 +178,14 @@ export const importacionController = {
             throw new Error("El archivo Excel tiene un formato incompatible o está dañado.");
         }
     },
+
     async iniciarCargaFinal() {
         if (this.datosValidados.length === 0) {
             return Swal.fire('Atención', 'No hay datos válidos para cargar', 'warning');
         }
-
         try {
             importacionView.mostrarProgreso(0);
-
-            const resultado = await this.procesarCarga(this.datosValidados, (porcentaje) => {
-                importacionView.mostrarProgreso(porcentaje);
-            });
-
+            const resultado = await this.procesarCarga(this.datosValidados, (p) => importacionView.mostrarProgreso(p));
             importacionView.notificarExitoFinal(resultado.exitos);
             this.datosValidados = [];
         } catch (error) {
@@ -179,29 +201,39 @@ export const importacionController = {
         for (let i = 0; i < total; i++) {
             try {
                 const prod = datosValidados[i];
-                const idHija = await this._resolverJerarquia(prod.subcategoria, prod.categoria_padre);
 
+                // 1. Resolver categoría: si tiene subcategoría, vincular a la subcategoría; si no, a la categoría directa
+                const idCategoria = await this._resolverCategoria(prod.categoria, prod.subcategoria);
+
+                // 2. Crear producto base (sin precio/stock, van en sucursal_producto)
                 const res = await productoModel.crear({
                     nombre: prod.nombre,
                     descripcion: prod.descripcion || '',
                     portada: prod.portada,
-                    precio: prod.precio,
-                    stock: prod.stock,
                     price_visible: true,
                     ws_active: prod.whatsapp
                 });
 
                 if (res.exito) {
                     const nuevoId = res.data.id;
-                    await Promise.all([
-                        productoCategoriaModel.vincular(nuevoId, idHija),
-                        this._crearGaleriaPlaceholder(nuevoId, prod.imagenes_cant, prod.videos_cant)
-                    ]);
+
+                    // 3. Vincular categoría y asignar sucursales en paralelo
+                    const promesas = [productoCategoriaModel.vincular(nuevoId, idCategoria)];
+
+                    prod.sucursales.forEach(s => {
+                        promesas.push(sucursalProductoModel.asignarProducto({
+                            idSucursal: s.id_sucursal,
+                            idProducto: nuevoId,
+                            precio: s.precio,
+                            stock: s.stock
+                        }));
+                    });
+
+                    await Promise.all(promesas);
                     exitos++;
                 }
 
                 if (onProgress) onProgress(Math.round(((i + 1) / total) * 100));
-
             } catch (e) {
                 console.error(`Error procesando fila ${i + 1}:`, e);
             }
@@ -209,56 +241,46 @@ export const importacionController = {
         return { exitos, totalProcesado: total };
     },
 
-    async _resolverJerarquia(nombreHija, nombrePadre) {
+    /**
+     * Resuelve el ID de categoría a vincular.
+     * - Si hay subcategoría: busca/crea la subcategoría bajo la categoría padre
+     * - Si no hay subcategoría: busca/crea la categoría directamente (sin padre)
+     */
+    async _resolverCategoria(nombreCategoria, nombreSubcategoria) {
         const categoriasActuales = await categoriasModel.obtenerTodas();
 
-        const hijaExistente = categoriasActuales.find(c =>
-            c.nombre.toLowerCase() === nombreHija.toLowerCase().trim()
-        );
-
-        if (hijaExistente) return hijaExistente.id;
-
-        let idPadreFinal = null;
-        if (nombrePadre) {
-            const padreExistente = categoriasActuales.find(c =>
-                c.nombre.toLowerCase() === nombrePadre.toLowerCase().trim()
+        if (nombreSubcategoria) {
+            // Buscar subcategoría existente
+            const subExistente = categoriasActuales.find(c =>
+                c.nombre.toLowerCase() === nombreSubcategoria.toLowerCase() && c.id_padre !== null
             );
+            if (subExistente) return subExistente.id;
 
+            // Resolver/crear categoría padre primero
+            let idPadre = null;
+            const padreExistente = categoriasActuales.find(c =>
+                c.nombre.toLowerCase() === nombreCategoria.toLowerCase() && c.id_padre === null
+            );
             if (padreExistente) {
-                idPadreFinal = padreExistente.id;
+                idPadre = padreExistente.id;
             } else {
-                const resPadre = await categoriasModel.crear({
-                    nombre: nombrePadre.trim(),
-                    id_padre: null,
-                    visible: true
-                });
-                if (resPadre.exito) idPadreFinal = resPadre.data.id;
+                const resPadre = await categoriasModel.crear({ nombre: nombreCategoria.trim(), id_padre: null, visible: true });
+                if (resPadre.exito) idPadre = resPadre.data.id;
             }
-        }
 
-        const resHija = await categoriasModel.crear({
-            nombre: nombreHija.trim(),
-            id_padre: idPadreFinal,
-            visible: true
-        });
+            // Crear subcategoría bajo el padre
+            const resSub = await categoriasModel.crear({ nombre: nombreSubcategoria.trim(), id_padre: idPadre, visible: true });
+            return resSub.exito ? resSub.data.id : idPadre;
 
-        return resHija.exito ? resHija.data.id : null;
-    },
+        } else {
+            // Sin subcategoría: vincular directamente a la categoría
+            const catExistente = categoriasActuales.find(c =>
+                c.nombre.toLowerCase() === nombreCategoria.toLowerCase()
+            );
+            if (catExistente) return catExistente.id;
 
-    async _crearGaleriaPlaceholder(prodId, imgCant, vidCant) {
-        const items = [];
-        const nImg = parseInt(imgCant) || 0;
-        const nVid = parseInt(vidCant) || 0;
-
-        for (let i = 0; i < nImg; i++) {
-            items.push({ url: 'https://via.placeholder.com/800x600?text=Subir+Imagen', tipo: 'imagen', orden: i });
-        }
-        for (let j = 0; j < nVid; j++) {
-            items.push({ url: 'https://www.w3schools.com/html/mov_bbb.mp4', tipo: 'video', orden: nImg + j });
-        }
-
-        if (items.length > 0) {
-            await galeriaProductoModel.createLote(prodId, items);
+            const resCat = await categoriasModel.crear({ nombre: nombreCategoria.trim(), id_padre: null, visible: true });
+            return resCat.exito ? resCat.data.id : null;
         }
     }
 };

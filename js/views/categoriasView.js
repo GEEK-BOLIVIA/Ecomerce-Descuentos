@@ -146,6 +146,10 @@ export const categoriasView = {
 
     cambiarTab(idTab) {
         this._estado.pestanaActiva = idTab;
+        // Sincronizar el active del sidebar
+        const idSidebar = idTab === 'categorias' ? 'link-categorias' : 'link-subcategorias';
+        const elSidebar = document.getElementById(idSidebar);
+        if (elSidebar && window.actualizarEstadoActivo) window.actualizarEstadoActivo(elSidebar);
         categoriasController.refrescarVista();
     },
 

@@ -162,9 +162,9 @@ export const carruselModel = {
                 .from('carrusel_items')
                 .select(`
                 *,
-                producto:producto_id (id, nombre, imagen_url, precio),
-                categoria:categoria_id (id, nombre) 
-            `) // Quitamos "imagen" o "imagen_url" de aquí
+                producto:producto_id (id, nombre, imagen_url),
+                categoria:categoria_id (id, nombre)
+            `)
                 .eq('carrusel_id', carruselId)
                 .order('orden', { ascending: true });
 
@@ -216,7 +216,6 @@ export const carruselModel = {
                 orden: item.orden || 0,
                 titulo_manual: item.titulo_manual || null,
                 subtitulo_manual: item.subtitulo_manual || null,
-                // Aquí centralizamos tanto la URL como el nombre del icono
                 imagen_url_manual: item.imagen_url_manual || item.icono_manual || null,
                 link_destino_manual: item.link_destino_manual || null,
                 producto_id: item.producto_id || null,

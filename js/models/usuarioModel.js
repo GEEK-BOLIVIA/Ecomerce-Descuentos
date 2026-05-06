@@ -142,7 +142,7 @@ export const usuarioModel = {
         try {
             const { data, error } = await supabase
                 .from('usuario')
-                .select('*')
+                .select('*, sucursal(id, nombre)')
                 .eq('visible', true)
                 .order('apellido_paterno', { ascending: true });
 
@@ -154,6 +154,20 @@ export const usuarioModel = {
         }
     },
 
+    async obtenerSucursales() {
+        try {
+            const { data, error } = await supabase
+                .from('sucursal')
+                .select('id, nombre')
+                .order('nombre', { ascending: true });
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error al obtener sucursales:', error.message);
+            return [];
+        }
+    },
+
     /**
      * Obtiene un usuario por su UUID (ID de Auth)
      */
@@ -161,7 +175,7 @@ export const usuarioModel = {
         try {
             const { data, error } = await supabase
                 .from('usuario')
-                .select('*')
+                .select('*, sucursal(id, nombre)')
                 .eq('id', id)
                 .single();
 
@@ -177,9 +191,9 @@ export const usuarioModel = {
         try {
             const { data, error } = await supabase
                 .from('usuario')
-                .select('*')
+                .select('*, sucursal(id, nombre)')
                 .eq('visible', true)
-                .eq('rol', rol) // Filtramos por el rol específico
+                .eq('rol', rol)
                 .order('apellido_paterno', { ascending: true });
 
             if (error) throw error;
@@ -335,18 +349,20 @@ export const usuarioModel = {
             if (authError) throw authError;
 
             // 3. Completar la información en la tabla 'usuario'
-            // Usamos un pequeño reintento lógico o aseguramos el ID del usuario creado
+            const updatePayload = {
+                nombres: datos.nombres,
+                apellido_paterno: datos.apellido_paterno,
+                apellido_materno: datos.apellido_materno,
+                ci: datos.ci,
+                celular: datos.celular,
+                rol: datos.rol,
+                visible: true
+            };
+            if (datos.id_sucursal) updatePayload.id_sucursal = datos.id_sucursal;
+
             const { error: dbError } = await supabase
                 .from('usuario')
-                .update({
-                    nombres: datos.nombres,
-                    apellido_paterno: datos.apellido_paterno,
-                    apellido_materno: datos.apellido_materno,
-                    ci: datos.ci,
-                    celular: datos.celular,
-                    rol: datos.rol, // Aseguramos que el rol sea el correcto
-                    visible: true
-                })
+                .update(updatePayload)
                 .eq('id', authData.user.id);
 
             if (dbError) throw dbError;

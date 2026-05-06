@@ -184,9 +184,13 @@ export const usuarioController = {
             const usuario = await usuarioModel.obtenerUsuarioActual();
             const tablaRef = `usuarios_${rol.toLowerCase()}`;
 
+            const columnasPorDefecto = rol.toLowerCase() === 'supervisor'
+                ? ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'sucursal', 'acciones']
+                : ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'];
+
             this._columnasVisiblesPorRol[rol] = await configuracionColumnasController.obtenerColumnasVisibles(
                 tablaRef,
-                ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
+                columnasPorDefecto,
                 usuario?.id,
                 usuario?.rol
             );
@@ -272,28 +276,28 @@ export const usuarioController = {
      */
     async mostrarFormulario(id = null) {
         try {
-            // 1. Preparar datos iniciales
             let datos = { nombres: '', correo_electronico: '', ci: '', celular: '' };
             const titulo = id ? `Editar ${this._estado.configActual.rol}` : `Nuevo ${this._estado.configActual.rol}`;
 
-            // 2. Si es edición, obtener datos del usuario
             if (id) {
-                const usuarios = await usuarioModel.obtenerTodos(); // O usar un método obtenerPorId si lo tienes
+                const usuarios = await usuarioModel.obtenerTodos();
                 const usuario = usuarios.find(u => u.id === id);
                 if (usuario) datos = { ...usuario };
             }
 
-            // 3. Mostrar el modal (el que tiene el toggle de Invitación/Directo)
+            const esSupervisor = this._estado.rolActual.toLowerCase() === 'supervisor';
+            const sucursales = esSupervisor ? await usuarioModel.obtenerSucursales() : [];
+
             const resultadoForm = await usuarioView.mostrarFormularioUsuario({
                 titulo: titulo,
                 datos: datos,
                 color: this._estado.configActual.color,
-                esEdicion: !!id
+                esEdicion: !!id,
+                sucursales: sucursales,
+                esSupervisor: esSupervisor
             });
 
-            // 4. Si el usuario confirmó el modal, procedemos a guardar
             if (resultadoForm) {
-                // Importante: Inyectamos el ROL actual para evitar el error de base de datos
                 const payloadCompleto = {
                     ...resultadoForm,
                     rol: this._estado.rolActual
@@ -351,7 +355,8 @@ export const usuarioController = {
                     resultado = await usuarioModel.autorizarEnWhitelist({
                         nombres: datos.nombres,
                         correo_electronico: emailLimpio,
-                        rol: this._estado.rolActual
+                        rol: this._estado.rolActual,
+                        id_sucursal: datos.id_sucursal || null
                     });
                 }
             }
@@ -372,12 +377,13 @@ export const usuarioController = {
     },
     async editar(id) {
         try {
-            // SweetAlert de carga mientras busca el usuario
             usuarioView.mostrarCargando('Cargando datos del usuario...');
-            const usuario = await usuarioModel.obtenerPorId(id);
+            const [usuario, sucursales] = await Promise.all([
+                usuarioModel.obtenerPorId(id),
+                usuarioModel.obtenerSucursales()
+            ]);
             Swal.close();
-
-            if (usuario) editarUsuarioModal.mostrar(usuario);
+            if (usuario) editarUsuarioModal.mostrar(usuario, usuario.rol === 'supervisor' ? sucursales : []);
         } catch (error) {
             usuarioView.notificarError("Error al cargar el usuario.");
         }
@@ -470,7 +476,10 @@ export const usuarioController = {
         usuarioView.mostrarCargando('Preparando formulario...');
 
         try {
-            const usuario = await usuarioModel.obtenerPorId(id);
+            const [usuario, sucursales] = await Promise.all([
+                usuarioModel.obtenerPorId(id),
+                usuarioModel.obtenerSucursales()
+            ]);
             Swal.close();
 
             const { isConfirmed } = await Swal.fire({
@@ -488,7 +497,7 @@ export const usuarioController = {
                 }
             });
 
-            if (isConfirmed) editarUsuarioModal.mostrar(usuario);
+            if (isConfirmed) editarUsuarioModal.mostrar(usuario, usuario.rol === 'supervisor' ? sucursales : []);
 
         } catch (error) {
             usuarioView.notificarError('Error al cargar el usuario.');

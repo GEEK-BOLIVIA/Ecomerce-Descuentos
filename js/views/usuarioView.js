@@ -230,6 +230,7 @@ export const usuarioView = {
                             ${cols.includes('nombre') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase">Nombre Completo</th>` : ''}
                             ${cols.includes('ci') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">C.I.</th>` : ''}
                             ${cols.includes('telefono') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Teléfono</th>` : ''}
+                            ${cols.includes('sucursal') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center">Sucursal</th>` : ''}
                             ${cols.includes('acciones') ? `<th class="px-6 py-5 text-[11px] font-bold text-slate-400 uppercase text-center w-48">Acciones</th>` : ''}
                         </tr>
                     </thead>
@@ -295,6 +296,13 @@ export const usuarioView = {
             ${cols.includes('telefono') ? `
             <td class="px-6 py-4 text-center">
                 <span class="text-slate-600 font-bold text-xs">${u.celular || '---'}</span>
+            </td>` : ''}
+            ${cols.includes('sucursal') ? `
+            <td class="px-6 py-4 text-center">
+                ${u.sucursal
+                    ? `<span class="inline-flex items-center gap-1 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl px-3 py-1 text-[11px] font-bold uppercase">${u.sucursal.nombre}</span>`
+                    : `<span class="text-slate-300 text-xs font-bold">---</span>`
+                }
             </td>` : ''}
             ${cols.includes('acciones') ? `
             <td class="px-6 py-4">
@@ -367,7 +375,22 @@ export const usuarioView = {
     /**
  * FORMULARIO DINÁMICO MEJORADO (CON SCROLL, BOTÓN X Y ALTO CONTRASTE)
  */
-    async mostrarFormularioUsuario({ titulo, datos, color = 'blue', esEdicion }) {
+    async mostrarFormularioUsuario({ titulo, datos, color = 'blue', esEdicion, sucursales = [], esSupervisor = false }) {
+        const opcionesSucursal = sucursales.map(s =>
+            `<option value="${s.id}" ${datos.id_sucursal === s.id ? 'selected' : ''}>${s.nombre}</option>`
+        ).join('');
+
+        const campSucursal = esSupervisor ? `
+            <div class="space-y-1 md:col-span-2">
+                <label class="text-[10px] font-bold text-slate-900 uppercase ml-2 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[15px] text-slate-500">store</span> Sucursal
+                </label>
+                <select id="swal-sucursal" class="w-full bg-white text-slate-900 border border-blue-600/30 rounded-xl py-3 px-4 text-sm outline-none focus:border-blue-600 transition-all">
+                    <option value="">-- Sin sucursal asignada --</option>
+                    ${opcionesSucursal}
+                </select>
+            </div>` : '';
+
         const { value: formValues } = await Swal.fire({
             title: `<span class="text-slate-900 font-black uppercase text-[16px] tracking-tight">${titulo}</span>`,
             showCloseButton: true, // Agrega la X de cierre
@@ -463,6 +486,8 @@ export const usuarioView = {
                         </span>
                     </div>
                 </div>
+
+                ${campSucursal}
             </div>
         </div>
         
@@ -502,7 +527,8 @@ export const usuarioView = {
                     apellido_materno: document.getElementById('swal-materno')?.value.trim() || '',
                     ci: document.getElementById('swal-ci')?.value.trim() || '',
                     celular: document.getElementById('swal-celular')?.value.trim() || '',
-                    password: document.getElementById('swal-password')?.value || ''
+                    password: document.getElementById('swal-password')?.value || '',
+                    id_sucursal: document.getElementById('swal-sucursal')?.value || null
                 };
 
                 if (!esEdicion && modoDirecto) {

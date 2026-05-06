@@ -1,8 +1,8 @@
 export const editarUsuarioModal = {
 
-    mostrar(u) {
+    mostrar(u, sucursales = []) {
         document.getElementById('modal-edicion-usuario')?.remove();
-        document.body.appendChild(this._construir(u));
+        document.body.appendChild(this._construir(u, sucursales));
         this._animar();
     },
 
@@ -25,6 +25,7 @@ export const editarUsuarioModal = {
         const ci       = document.getElementById('edit-ci').value.trim();
         const celular  = document.getElementById('edit-celular').value.trim();
         const errorEl  = document.getElementById('edit-error');
+        const sucursalEl = document.getElementById('edit-sucursal');
 
         if (!nombres || !paterno) {
             errorEl.textContent = 'El nombre y el apellido paterno son obligatorios.';
@@ -33,7 +34,9 @@ export const editarUsuarioModal = {
         }
 
         errorEl.classList.add('hidden');
-        return { nombres, apellido_paterno: paterno, apellido_materno: materno, ci, celular };
+        const payload = { nombres, apellido_paterno: paterno, apellido_materno: materno, ci, celular };
+        if (sucursalEl) payload.id_sucursal = sucursalEl.value || null;
+        return payload;
     },
 
     setGuardando(activo) {
@@ -56,7 +59,26 @@ export const editarUsuarioModal = {
         });
     },
 
-    _construir(u) {
+    _construir(u, sucursales = []) {
+        const opcionesSucursal = sucursales.map(s =>
+            `<option value="${s.id}" ${u.id_sucursal === s.id ? 'selected' : ''}>${s.nombre}</option>`
+        ).join('');
+
+        const campSucursal = u.rol === 'supervisor' ? `
+            <div class="flex items-center gap-3">
+                <div class="flex-1 h-px bg-slate-100"></div>
+                <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Sucursal</span>
+                <div class="flex-1 h-px bg-slate-100"></div>
+            </div>
+            <div class="space-y-1">
+                <label for="edit-sucursal" class="text-[10px] font-black text-slate-400 uppercase ml-1">Sucursal Asignada</label>
+                <select id="edit-sucursal"
+                        class="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/15 focus:border-violet-400 transition-all">
+                    <option value="">-- Sin sucursal asignada --</option>
+                    ${opcionesSucursal}
+                </select>
+            </div>` : '';
+
         const el = document.createElement('div');
         el.id = 'modal-edicion-usuario';
         el.innerHTML = `
@@ -87,7 +109,7 @@ export const editarUsuarioModal = {
                     </button>
                 </div>
 
-                <div class="px-6 py-6 space-y-5">
+                <div class="px-6 py-6 space-y-5 max-h-[65vh] overflow-y-auto custom-scrollbar">
                     <div class="space-y-1">
                         <label class="text-[10px] font-black text-slate-400 uppercase ml-1">Correo Electrónico</label>
                         <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
@@ -139,6 +161,8 @@ export const editarUsuarioModal = {
                                    class="w-full bg-white border border-slate-200 rounded-2xl py-3 px-4 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-400 transition-all">
                         </div>
                     </div>
+
+                    ${campSucursal}
 
                     <p id="edit-error" class="hidden text-red-500 text-xs font-bold bg-red-50 border border-red-100 rounded-xl px-4 py-2.5"></p>
                 </div>

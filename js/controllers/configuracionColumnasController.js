@@ -12,7 +12,7 @@ export const configuracionColumnasController = {
         subcategorias: ['nombre', 'categoria_padre'],
         usuarios_owner: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
         usuarios_admin: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
-        usuarios_supervisor: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
+        usuarios_supervisor: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'sucursal', 'acciones'],
         usuarios_cliente: ['nro', 'perfil', 'nombre', 'ci', 'telefono', 'acciones'],
         sucursales: ['nro', 'sucursal', 'direccion', 'productos', 'acciones'],
         departamentos: ['nro', 'departamento', 'acciones'],

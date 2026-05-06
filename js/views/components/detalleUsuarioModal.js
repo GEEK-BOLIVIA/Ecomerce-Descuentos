@@ -103,6 +103,18 @@ export const detalleUsuarioModal = {
                             </div>
                         </div>
                     </div>
+
+                    ${u.rol === 'supervisor' ? `
+                    <!-- Sucursal -->
+                    <div class="flex items-center gap-3 p-4 bg-violet-50 border border-violet-100 rounded-2xl">
+                        <div class="w-9 h-9 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center flex-shrink-0">
+                            <span class="material-symbols-outlined text-[18px]">store</span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[10px] font-black text-violet-400 uppercase tracking-widest">Sucursal Asignada</p>
+                            <p class="text-violet-700 font-bold text-sm">${u.sucursal?.nombre || 'Sin sucursal asignada'}</p>
+                        </div>
+                    </div>` : ''}
                 </div>
 
                 <!-- Footer -->
